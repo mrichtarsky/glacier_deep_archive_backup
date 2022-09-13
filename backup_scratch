@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    echo "Usage: ./backup_scratch SETTINGS_FILE"
+    echo "  Example: ./backup_scratch config/backup.sh"
+    exit 1
+fi
+
+SETTINGS=$1
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH+=:$ROOT
+pushd "$ROOT" >/dev/null
+trap 'popd >/dev/null' EXIT
+
+unbuffer impl/do_backup_to_aws.sh scratch "$SETTINGS" 2>&1 | tee logs/backup_scratch.log

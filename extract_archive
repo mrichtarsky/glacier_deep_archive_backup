@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 2 ]]; then
+    echo "Usage: ./extract_archive ARCHIVE DEST_PATH"
+    echo "  Example: ./extract_archive tank_pics_000.tar.zstd.ssl /tank_restore"
+    exit 1
+fi
+
+ARCHIVE=$1
+DEST=$2
+
+pushd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" >/dev/null
+trap 'popd >/dev/null' EXIT
+
+openssl enc -d -aes256 -kfile config/passphrase.txt -pbkdf2 -in "$ARCHIVE" | tar -x --zstd -C "$DEST"

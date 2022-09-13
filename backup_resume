@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 2 ]]; then
+    echo "Usage: ./backup_resume SETTINGS_FILE TIMESTAMP"
+    echo "  Example: ./backup_resume config/backup.sh 2022-02-22-220022"
+    exit 1
+fi
+
+SETTINGS=$1
+TIMESTAMP=$2
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH+=:$ROOT
+pushd "$ROOT" >/dev/null
+trap 'popd >/dev/null' EXIT
+
+if [[ ! -f state/resumable ]]; then
+    echo "Not able to resume, please run ./backup_scratch $SETTINGS first!"
+    exit 1
+fi
+
+unbuffer impl/do_backup_to_aws.sh resume "$SETTINGS" "$TIMESTAMP" 2>&1 | tee logs/backup_resume.log

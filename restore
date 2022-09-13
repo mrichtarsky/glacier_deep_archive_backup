@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    echo "Usage: ./restore SETTINGS_FILE"
+    echo "  Example: ./restore config/restore.sh"
+    exit 1
+fi
+
+SETTINGS=$1
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH+=:$ROOT
+pushd "$ROOT" >/dev/null
+trap 'popd >/dev/null' EXIT
+
+if [[ ! -s config/passphrase.txt ]]; then
+    echo "Please define a passphrase in config/passphrase.txt!"
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$SETTINGS"
+
+BUFFER_PATH="$BUFFER_PATH_BASE/restore_aws_buffer"
+rm -rf "$BUFFER_PATH"
+mkdir -p "$BUFFER_PATH"
+
+export BUFFER_PATH EXTRACT_PATH RESTORE_TIER S3_BUCKET TIMESTAMP
+
+unbuffer python impl/do_restore.py 2>&1 | tee logs/restore.log
