@@ -136,7 +136,8 @@ Should you wish to only restore some files to save time or money you can follow 
     - [`aws sync`](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html)
 
    Both tools store files 1:1 in Deep Archive. Due to the cost structure this is prohibitively expensive, and the reason why this script creates archives. `aws sync` only supports server-side encryption, instead of client-side as done by this script. It cannot restore files automatically out of Deep Archive, while for `rclone` it's a manual step. This script does it automatically and also waits for the files to become available, to get the restore done as fast as possible.
-    - [Arq](https://www.arqbackup.com/) - not tested yet, unclear how it stores files and whether it can restore automatically
+    - [Arq](https://www.arqbackup.com/) - Only supports Windows/macOS. Apart from that it looks pretty good, the amount of files created is already 40 for ~700 MiB of data, but it probably scales much better than a 1:1 copy. Also able to restore single files, and automatically requests restores and waits for them.
+
 # ToDo
 
 - Add automated E2E test
