@@ -1,5 +1,7 @@
 # Introduction
 
+**Note: If you are relying on this for your last-resort backup, please read everything below!**
+
 `glacier_deep_archive_backup` is a backup solution that uses [S3 Glacier Deep Archive](https://aws.amazon.com/blogs/aws/new-amazon-s3-storage-class-glacier-deep-archive/) for storage. This is the most cost effective cloud backup storage I'm aware of. The use case is for full, off-site, encrypted backups that are only retrieved after a catastrophe (i.e. your house burns down, RAID *and* local backups are gone). This is reflected by the [cost structure](https://aws.amazon.com/s3/pricing/) and properties of Deep Archive:
 
 - Upload is free
@@ -59,7 +61,8 @@ unzip main.zip
 ## Backup
 
 - `cp config/backup_example.sh config/backup.sh` and edit `backup.sh` to reflect your setup. In `BACKUP_PATHS`, list all the files and directories that will be backed up recursively. Make sure to use double quotes to escape names that `"have spaces"` etc.
-- Edit `config/passphrase.txt` and put a strong passphrase there. Your data will be encrypted locally using this password before upload. *Make sure this file is only readable/writable by you!*
+- Edit `config/passphrase.txt` and put a strong passphrase there. Your data will be encrypted locally using this password before upload. **Make sure this file is only readable/writable by you!**
+
 - Run `./backup_scratch.sh config/backup.sh` to start the backup. Logs are in `logs/backup_scratch.log`.
 - If the backup fails for some reason (e.g. internet down), use `./backup_resume config/backup.sh TIMESTAMP` to resume.
     - `TIMESTAMP` is the timestamp displayed by the earlier scratch backup run
@@ -80,11 +83,24 @@ tank_pics_000_contents.txt  # The list of dirs/files stored in the archive,
 tank_pics_000.tar.zstd.ssl  # The tar archive, zstd compressed, aes256 encrypted
 ```
 
+You should store everything you need to restore the backup in a safe location:
+
+- Your passphrase
+- Credentials to access AWS
+
+Consider you want to be able to retrieve these backups when your house has burnt down.
+
+You should also test a full backup/restore cycle once. It can involve a small subset of data, e.g. 10 GiB, which will make the test cheap.
+
 ## Restore
 
 - `cp config/restore_example.sh config/restore.sh` and edit `restore.sh` to reflect your setup
 - Run `./restore config/restore.sh`. This attempts to restore all files to the location specified.
-- Note that it is not possible to directly download files from Deep Archive: First you need to schedule an archive for restore, which will basically retrieve it from tape and put it in S3 blob storage on AWS side. Then it can be downloaded. The script automates all this, including decryption and extraction after download.
+- Note that it is not possible to directly download files from Deep Archive: First you need to schedule an archive for restore, which will basically retrieve it from tape and put it in S3 blob storage on AWS side. Then it can be downloaded. The script automates all this, including:
+    - Waiting for the file to become available
+    - Downloading
+    - Decryption
+    - Extraction
 - Restore will incur costs for restore and transfer. See above for a detailed breakdown.
 
 Should you wish to only restore some files to save time or money you can follow these manual steps:
@@ -95,10 +111,32 @@ Should you wish to only restore some files to save time or money you can follow 
 
 # Misc
 
+- In addition to the costs above, there are these small additional charges:
+    - $0.10/1000 requests for data retrieval
+    - $0.05/1000 PUT, COPY, POST, LIST requests
+    - $0.0004/1000 GET, SELECT, and all other requests
+    - 8 KB overhead/file billed at S3 standard storage rates
+    - 32 KB overhead/file billed at Deep Archive rates
+
+    The script creates archives, so the number of files stored is very small. For an upload limit of 50 GiB, you would get 40 files/TiB. So these costs are negligible. Most other backup solutions operate 1:1 at a file level, and it's not possible to get the low Deep Archive costs that way (see alternatives below).
+
+    You can check the full details on the [pricing page](https://aws.amazon.com/s3/pricing/).
+
 - Symlinks are *not* followed. Therefore, links pointing to files not covered by the paths backed up will not be considered!
+
 - No file splitting: The largest file must fit into `UPLOAD_LIMIT_MB`.
+
 - Backup files are not deleted in your S3 bucket, you need to take care of this yourself
 
+
+# Alternatives
+
+- There are other backup solutions that can target Deep Glacier:
+    - [`rclone`](https://rclone.org/)
+    - [`aws sync`](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html)
+
+   Both tools store files 1:1 in Deep Archive. Due to the cost structure this is prohibitively expensive, and the reason why this script creates archives. `aws sync` only supports server-side encryption, instead of client-side as done by this script. It cannot restore files automatically out of Deep Archive, while for `rclone` it's a manual step. This script does it automatically and also waits for the files to become available, to get the restore done as fast as possible.
+    - [Arq](https://www.arqbackup.com/) - not tested yet, unclear how it stores files and whether it can restore automatically
 # ToDo
 
 - Add automated E2E test
