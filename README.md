@@ -12,7 +12,7 @@
 
 - The assumption is that you will hopefully never need to restore ;) (and for testing, you can use the 100 GiB free download where you only pay for restore)
 - Note: The minimum storage charge is for 180 days. So even if you delete your data earlier, you still pay. So this backup solution is not meant for fast-changing data, but it allows you to retain quite a few full backups that you can restore directly without applying several incremental backups on top.
-- Data is stored across 3 or more AWS Availability Zones, providing 99.999999999% data durability
+- Data is stored across 3 or more AWS Availability Zones, providing [99.999999999% data durability](https://aws.amazon.com/s3/storage-classes/#____)
 - All quoted prices are for US East, some regions are more expensive
 
 The script relies on the ZFS file system's snapshot capabilities to provide a consistent state of the file system during upload (which can take days). So this will only work for data on ZFS pools, although it could be adapted to work for other snapshotting file systems or by losening the consistency requirements.
