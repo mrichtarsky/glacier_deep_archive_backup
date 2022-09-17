@@ -21,6 +21,21 @@ import stat
 import subprocess
 import sys
 
+def size_to_string(size):
+    KiB = 1024
+    MiB = 1024*KiB
+    GiB = 1024*MiB
+    TiB = 1024*GiB
+    if size >= TiB:
+        return f"{size / TiB:.2f} TiB"
+    if size >= GiB:
+        return f"{size / GiB:.2f} GiB"
+    if size >= MiB:
+        return f"{size / MiB:.2f} MiB"
+    if size >= KiB:
+        return f"{size / KiB:.2f} KiB"
+    return f"{size} B"
+
 class SetWriter():
     def __init__(self, snapshot_path, set_path, zfs_pool):
         self.snapshot_path = snapshot_path
@@ -32,24 +47,8 @@ class SetWriter():
         name = re.sub('[^a-zA-Z0-9_-]', '_', name)
         return name
 
-    @staticmethod
-    def _size_to_string(size):
-        KiB = 1024
-        MiB = 1024*KiB
-        GiB = 1024*MiB
-        TiB = 1024*GiB
-        if size >= TiB:
-            return f"{size / TiB:.2f} TiB"
-        if size >= GiB:
-            return f"{size / GiB:.2f} GiB"
-        if size >= MiB:
-            return f"{size / MiB:.2f} MiB"
-        if size >= KiB:
-            return f"{size / KiB:.2f} KiB"
-        return f"{size} B"
-
     def write_set(self, path, items, size):
-        print(f"Set: {path=}, {len(items)} item(s), {SetWriter._size_to_string(size)}")
+        print(f"Set: {path=}, {len(items)} item(s), {size_to_string(size)}")
         archive_name = self._make_archive_name(path)
 
         counter = 0
@@ -177,7 +176,7 @@ def crawl(snapshot_path, backup_paths):
 
     for path in backup_paths:
         path = os.path.join(snapshot_path, path)
-        print('Processing', path)
+        print('Crawling', path)
 
         sub_num_files = DualCounter('subfiles', 'walk', 'find')
         sub_size_files = DualCounter('subsize', 'walk', 'find')
@@ -227,7 +226,7 @@ def crawl_and_write(snapshot_path, backup_paths, state_file):
 def load(state_file, upload_limit, set_writer):
     with open(state_file, 'rb') as f:
         root_node = pickle.load(f)
-    print('Total size of backed up files:', root_node.get_size())
+    print('Total size of backed up files:', size_to_string(root_node.get_size()))
     root_node.create_backup_sets(upload_limit, set_writer)
 
 
