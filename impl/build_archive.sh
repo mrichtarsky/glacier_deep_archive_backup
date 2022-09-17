@@ -4,4 +4,4 @@ set -euo pipefail
 FILE_LIST=$1
 ARCHIVE=$2
 
-tar --create --file=- -v --verbatim-files-from "--files-from=$FILE_LIST" --zstd | openssl enc -e -aes256 -kfile config/passphrase.txt -pbkdf2 -out "$ARCHIVE"
+tar --create --file=- -v --verbatim-files-from "--files-from=$FILE_LIST" --zstd | gpg -c --cipher-algo AES256 --passphrase-file config/passphrase.txt --batch >"$ARCHIVE"

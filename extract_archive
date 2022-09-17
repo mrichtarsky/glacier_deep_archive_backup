@@ -13,4 +13,4 @@ DEST=$2
 pushd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" >/dev/null
 trap 'popd >/dev/null' EXIT
 
-openssl enc -d -aes256 -kfile config/passphrase.txt -pbkdf2 -in "$ARCHIVE" | tar -x --zstd -C "$DEST"
+gpg -d --passphrase-file config/passphrase.txt --batch --quiet "$ARCHIVE" | tar -x --zstd -C "$DEST"
