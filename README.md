@@ -113,6 +113,9 @@ Should you wish to only restore some files to save time or money you can follow 
 # Misc
 
 - Data is encryption using [`gpg`](https://www.gnupg.org/) (`AES256` cipher)
+
+- Incremental backups are not supported
+
 - In addition to the costs above, there are these small additional charges:
     - $0.10/1000 requests for data retrieval
     - $0.05/1000 PUT, COPY, POST, LIST requests
