@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
     echo "Usage: ./extract_archive ARCHIVE DEST_PATH"
-    echo "  Example: ./extract_archive tank_pics_000.tar.zstd.ssl /tank_restore"
+    echo "  Example: ./extract_archive tank_pics_000.tar.zstd.gpg /tank_restore"
     exit 1
 fi
 

@@ -20,7 +20,7 @@ def get_set_files(set_path):
     return set_files
 
 def build_archive(set_file, buffer_path):
-    archive_name = f"{os.path.basename(set_file)}.tar.zstd.ssl"
+    archive_name = f"{os.path.basename(set_file)}.tar.zstd.gpg"
     buffer_file = os.path.join(buffer_path, archive_name)
     cmd = ('impl/build_archive.sh', set_file, buffer_file)
     print('Running', ' '.join(cmd))

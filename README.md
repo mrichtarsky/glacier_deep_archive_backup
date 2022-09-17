@@ -81,7 +81,7 @@ Backups are saved in your S3 bucket in a timestamped directory (e.g. `2022-02-18
 tank_pics_000_contents.txt  # The list of dirs/files stored in the archive,
                             # as passed to tar. Will not recursively list files of
                             # a directory if that directory was passed to tar.
-tank_pics_000.tar.zstd.ssl  # The tar archive, zstd compressed, aes256 encrypted
+tank_pics_000.tar.zstd.gpg  # The tar archive, zstd compressed, aes256 encrypted
 ```
 
 You should store everything you need to restore the backup in a safe location:
@@ -108,7 +108,7 @@ Should you wish to only restore some files to save time or money you can follow 
 
 - In the S3 web interface select the file and initiate restore. You can choose between Standard and Bulk retrieval (Bulk $2.56/TiB, Standard $20.48/TiB).
 - Once the file is available, download it
-- Use `./extract_archive ARCHIVE DEST_PATH` to decrypt and extract it (e.g. `./extract_archive tank_pics_000.tar.zstd.ssl /tank_restore`)
+- Use `./extract_archive ARCHIVE DEST_PATH` to decrypt and extract it (e.g. `./extract_archive tank_pics_000.tar.zstd.gpg /tank_restore`)
 
 # Misc
 
