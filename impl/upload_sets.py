@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-from impl.tools import clean_multipart_uploads
+from impl.tools import BackupException, clean_multipart_uploads, size_to_string
 
 import os
+import shutil
 import subprocess
 import sys
 
@@ -77,6 +78,14 @@ if __name__ == '__main__':
     buffer_path = os.environ['BUFFER_PATH']
     s3_bucket = os.environ['S3_BUCKET']
     timestamp = os.environ['TIMESTAMP']
+
+    upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
+    _, _, bytes_free = shutil.disk_usage(buffer_path)
+
+    if bytes_free < upload_limit:
+        raise BackupException(f"Not enough disk space in buffer path {buffer_path} "
+                              f"(upload_limit={size_to_string(upload_limit)}, "
+                              f"bytes_free={size_to_string(bytes_free)})")
 
     num_errors = package_and_upload(set_path, buffer_path, s3_bucket, timestamp)
 

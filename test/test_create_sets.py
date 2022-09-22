@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-from impl.create_sets import BackupException, crawl, SetWriter
+from impl.create_sets import crawl, SetWriter
+from impl.tools import BackupException
 from impl.upload_sets import build_archive, get_set_files
 
 import os
@@ -151,6 +152,7 @@ def test_file_size_exceeds_upload_limit_throws():
     except BackupException:
         pass
 
+
 def do_test_fuzz():
     MAX_FILES = 1000
     MAX_FILE_LENGTH = 40
@@ -193,7 +195,6 @@ def do_test_fuzz():
     except:
         print(f"test_fuzz failed, inputs: {pool_files=}, {backup_paths=}, {upload_limit=}")
         raise
-
 
 def test_fuzz():
     NUM_RUNS = 100
