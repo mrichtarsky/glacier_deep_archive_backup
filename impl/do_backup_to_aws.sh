@@ -46,6 +46,13 @@ BUFFER_PATH="$BUFFER_PATH_BASE/backup_aws_buffer"
 rm -rf "$BUFFER_PATH"
 mkdir -p "$BUFFER_PATH"
 
+function cleanup()
+{
+    rm -rf "$BUFFER_PATH"
+}
+
+trap cleanup EXIT
+
 export BUFFER_PATH S3_BUCKET TIMESTAMP
 set +e
 touch state/resumable
