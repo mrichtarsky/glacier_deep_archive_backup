@@ -18,6 +18,8 @@ def get_set_files(set_path):
             set_file = os.path.join(root, file_)
             set_files.append(set_file)
 
+    set_files.sort()
+
     return set_files
 
 def build_archive(set_file, buffer_path):
