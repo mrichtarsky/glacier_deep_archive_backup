@@ -68,6 +68,8 @@ def package_and_upload(set_path, buffer_path, s3_bucket, timestamp):
         os.unlink(archive_file)
         if upload_success:
             os.unlink(set_file)
+            os.unlink(set_set_file)
+            os.unlink(contents_archive_file)
         else:
             num_errors += 1
 
