@@ -21,6 +21,9 @@ import stat
 import subprocess
 import sys
 
+class BackupException(Exception):
+    pass
+
 def size_to_string(size):
     KiB = 1024
     MiB = 1024*KiB
@@ -65,18 +68,22 @@ class SetWriter():
                 print(item, file=set_file)
 
 class Path():
-    def __init__(self, name, parent):
+    def __init__(self, name, parent, upload_limit):
         self.parent = parent
         self.name = name
+        self.upload_limit = upload_limit
         self.files = []
         self.dirs = {}
         self.size = None # Lazily computed
 
     def add_file(self, name, size):
+        if size > self.upload_limit:
+            raise BackupException(f"File size exceeds upload limit: {self.get_full_path()}/{name}"
+                                  f" (size={size_to_string(size)}, upload_limit={size_to_string(self.upload_limit)})")
         self.files.append((name, size))
 
     def get_dir(self, name):
-        return self.dirs.setdefault(name, Path(name, self))
+        return self.dirs.setdefault(name, Path(name, self, self.upload_limit))
 
     def get_full_path(self):
         if self.parent is None:
@@ -102,11 +109,11 @@ class Path():
             out += '\n'.join(map(lambda file_: os.path.join(path, file_[0]), self.files)) + '\n'
         return out
 
-    def create_backup_sets(self, upload_limit, set_writer):
+    def create_backup_sets(self, set_writer):
         path = self.get_full_path()
         size = self.get_size()
         is_snapshot_path = self.parent is None
-        if size <= upload_limit and not is_snapshot_path:
+        if size <= self.upload_limit and not is_snapshot_path:
             # When the snapshot_path fits, we still cannot simply zip it up fully
             # since only a subset of entries may be in the backup_paths.
             # But we may do so when we are in a subdirectory.
@@ -114,12 +121,12 @@ class Path():
         else:
             items = copy.copy(self.files)
             for dir_ in self.dirs.values():
-                if dir_.get_size() > upload_limit:
-                    dir_.create_backup_sets(upload_limit, set_writer)
+                if dir_.get_size() > self.upload_limit:
+                    dir_.create_backup_sets(set_writer)
                 else:
                     items.append((dir_.name, dir_.get_size()))
             if len(items) > 0:
-                bins = binpacking.to_constant_volume(items, upload_limit, weight_pos=1)
+                bins = binpacking.to_constant_volume(items, self.upload_limit, weight_pos=1)
                 for bin_ in bins:
                     size = sum(file_[1] for file_ in bin_)
                     items = [ os.path.join(path, item[0]) for item in bin_ ]
@@ -168,8 +175,8 @@ def update_find_counters(path, sub_num_files, sub_size_files):
     sub_size_files.add_counter2(size)
     sub_size_files.verify()
 
-def crawl(snapshot_path, backup_paths):
-    root_node = Path(snapshot_path, None)
+def crawl(snapshot_path, backup_paths, upload_limit):
+    root_node = Path(snapshot_path, None, upload_limit)
 
     num_files = DualCounter('files', 'walk', 'find')
     size_files = DualCounter('size', 'walk', 'find')
@@ -218,16 +225,16 @@ def crawl(snapshot_path, backup_paths):
 
     return root_node
 
-def crawl_and_write(snapshot_path, backup_paths, state_file):
-    root_node = crawl(snapshot_path, backup_paths)
+def crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file):
+    root_node = crawl(snapshot_path, backup_paths, upload_limit)
     with open(state_file, 'wb') as f:
         pickle.dump(root_node, f)
 
-def load(state_file, upload_limit, set_writer):
+def load(state_file, set_writer):
     with open(state_file, 'rb') as f:
         root_node = pickle.load(f)
     print('Total size of backed up files:', size_to_string(root_node.get_size()))
-    root_node.create_backup_sets(upload_limit, set_writer)
+    root_node.create_backup_sets(set_writer)
 
 
 if __name__ == '__main__':
@@ -239,6 +246,6 @@ if __name__ == '__main__':
     upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
 
     # Save state after crawling file system, so can be resumed later
-    crawl_and_write(snapshot_path, backup_paths, state_file)
+    crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file)
     set_writer = SetWriter(snapshot_path, set_path, zfs_pool)
-    load(state_file, upload_limit, set_writer)
+    load(state_file, set_writer)

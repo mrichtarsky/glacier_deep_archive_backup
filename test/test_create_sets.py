@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from impl.create_sets import crawl, SetWriter
+from impl.create_sets import BackupException, crawl, SetWriter
 from impl.upload_sets import build_archive, get_set_files
 
 import os
@@ -43,8 +43,8 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_
     subprocess.run(('sudo', 'rm', '-f', snapshot_path), check=True)
     subprocess.run(('sudo', 'ln', '-s', POOL_PATH, snapshot_path), check=True)
     set_writer = SetWriter(snapshot_path, SET_PATH, ZFS_POOL)
-    root_node = crawl(snapshot_path, backup_paths)
-    root_node.create_backup_sets(upload_limit, set_writer)
+    root_node = crawl(snapshot_path, backup_paths, upload_limit)
+    root_node.create_backup_sets(set_writer)
 
     set_files = get_set_files(SET_PATH)
     archive_paths = []
@@ -89,13 +89,6 @@ def test_one_set_multiple_files():
     )
 
     run_test(pool_files, ('a', ), SIZE_SMALL * 3)
-
-def test_file_too_large():
-    pool_files = (
-        ('a/1', SIZE_SMALL),
-    )
-
-    run_test(pool_files, ('a', ), SIZE_SMALL - 1)
 
 def test_three_dirs_include_two():
     pool_files = (
@@ -147,6 +140,16 @@ def test_top_level_files_and_dirs():
     run_test(pool_files, ('2', 'a', 'd'), SIZE_SMALL * 2)
     run_test(pool_files, ('1', 'a', 'c'), SIZE_SMALL * 2)
 
+def test_file_size_exceeds_upload_limit_throws():
+    pool_files = (
+        ('1', SIZE_SMALL),
+    )
+
+    try:
+        run_test(pool_files, ('1',), SIZE_SMALL - 1)
+        raise Exception('Expected exception, got none')
+    except BackupException:
+        pass
 
 def do_test_fuzz():
     MAX_FILES = 1000
