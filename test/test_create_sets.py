@@ -5,6 +5,7 @@ from impl.tools import BackupException
 from impl.upload_sets import build_archive, get_set_files
 
 import os
+import pytest
 import random
 import shutil
 import string
@@ -197,6 +198,7 @@ def do_test_fuzz():
               f"backup_paths={backup_paths}, upload_limit={upload_limit}")
         raise
 
+@pytest.mark.longrunner
 def test_fuzz():
     NUM_RUNS = 100
 
