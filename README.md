@@ -64,7 +64,7 @@ unzip main.zip
 - `cp config/backup_example.sh config/backup.sh` and edit `backup.sh` to reflect your setup. In `BACKUP_PATHS`, list all the files and directories that will be backed up recursively. Make sure to use double quotes to escape names that `"have spaces"` etc.
 - Edit `config/passphrase.txt` and put a strong passphrase there. Your data will be encrypted locally using this password before upload. **Make sure this file is only readable/writable by you!**
 
-- Run `./backup_scratch.sh config/backup.sh` to start the backup. Logs are in `logs/backup_scratch.log`.
+- Run `./backup_scratch config/backup.sh` to start the backup. Logs are in `logs/backup_scratch.log`.
 - If the backup fails for some reason (e.g. internet down), use `./backup_resume config/backup.sh TIMESTAMP` to resume.
     - `TIMESTAMP` is the timestamp displayed by the earlier scratch backup run
     - Logs are in `logs/backup_resume.log`
