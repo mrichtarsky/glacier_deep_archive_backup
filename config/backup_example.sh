@@ -5,9 +5,9 @@ set -euo pipefail
 # The ZFS pool with data to backup
 ZFS_POOL=tank
 
-# Files and directories to backup (recursively)
+# Files and directories to backup (recursively), relative to the ZFS pool specified above
 BACKUP_PATHS=(
-    "file1.txt"
+    "file1.txt"  # Will backup /tank/file1.txt
     "pics"
     "sports/nba"
 )
