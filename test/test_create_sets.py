@@ -193,7 +193,8 @@ def do_test_fuzz():
     try:
         run_test(pool_files, backup_paths, upload_limit)
     except:
-        print(f"test_fuzz failed, inputs: {pool_files=}, {backup_paths=}, {upload_limit=}")
+        print(f"test_fuzz failed, inputs: pool_files={pool_files}, "
+              f"backup_paths={backup_paths}, upload_limit={upload_limit}")
         raise
 
 def test_fuzz():

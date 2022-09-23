@@ -35,7 +35,7 @@ class SetWriter():
         return name
 
     def write_set(self, path, items, size):
-        print(f"Set: {path=}, {len(items)} item(s), {size_to_string(size)}")
+        print(f"Set: path={path}, {len(items)} item(s), {size_to_string(size)}")
         archive_name = self._make_archive_name(path)
 
         counter = 0
@@ -63,7 +63,8 @@ class Path():
     def add_file(self, name, size):
         if size > self.upload_limit:
             raise BackupException(f"File size exceeds upload limit: {self.get_full_path()}/{name}"
-                                  f" (size={size_to_string(size)}, upload_limit={size_to_string(self.upload_limit)})")
+                                  f" (size={size_to_string(size)}, "
+                                  f"upload_limit={size_to_string(self.upload_limit)})")
         self.files.append((name, size))
 
     def get_dir(self, name):
