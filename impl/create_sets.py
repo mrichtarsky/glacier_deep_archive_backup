@@ -145,12 +145,12 @@ class DualCounter:
         return result
 
 def update_find_counters(path, sub_num_files, sub_size_files):
-    cmd = f"find '{path}' -type f,l | wc -l"
+    cmd = f"find '{path}' \( -type f -o -type l \) | wc -l"
     output = subprocess.check_output(cmd, shell=True).decode()
     sub_num_files.add_counter2(int(output.strip()))
     sub_num_files.verify()
 
-    cmd = f"find '{path}' -type f,l -printf '%s\n' | awk '{{sum+=$1}} END {{print sum}}'"
+    cmd = f"find '{path}' \( -type f -o -type l \) -printf '%s\n' | awk '{{sum+=$1}} END {{print sum}}'"
     output = subprocess.check_output(cmd, shell=True).decode()
     output = output.strip()
     if len(output) == 0:
