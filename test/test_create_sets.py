@@ -5,6 +5,7 @@ from impl.tools import BackupException
 from impl.upload_sets import build_archive, get_set_files
 
 import os
+import pathlib
 import pytest
 import random
 import shutil
@@ -49,6 +50,12 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_
     root_node.create_backup_sets(set_writer)
 
     set_files = get_set_files(SET_PATH)
+    if len(set_files) == 0:
+        if len(backup_paths) == 0:
+            # Nothing else to verify, backup set is empty
+            return
+        raise Exception('backup_paths not empy, but no set files found')
+
     archive_paths = []
     for set_file in set_files:
         _, archive_path = build_archive(set_file, WORK_PATH)
@@ -56,12 +63,30 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_
 
     extract_path = os.path.join(WORK_PATH, 'extract')
     os.makedirs(extract_path, exist_ok=True)
+
     for archive_path in archive_paths:
         cmd = (os.path.join(SCRIPT_PATH, '..', 'extract_archive'), archive_path, extract_path)
         subprocess.run(cmd, check=True)
 
-    cmd = ('diff', '-r', snapshot_path, os.path.join(extract_path, snapshot_path))
-    subprocess.run(cmd, check=True)
+    relative_snapshot_path = pathlib.Path(snapshot_path).relative_to('/')
+    extract_base_path = os.path.join(extract_path, relative_snapshot_path)
+
+    # Condition 1: All backup paths must be identical
+    for backup_path in backup_paths:
+        snapshot_backup_path = os.path.join(snapshot_path, backup_path)
+        extract_backup_path = os.path.join(extract_base_path, backup_path)
+        cmd = ('diff', '-r', snapshot_backup_path, extract_backup_path)
+        print(cmd)
+        subprocess.run(cmd, check=True)
+        if os.path.islink(extract_backup_path) or os.path.isfile(extract_backup_path):
+            os.remove(extract_backup_path)
+        else:
+            shutil.rmtree(extract_backup_path)
+
+    # Condition 2: No extra files
+    items = os.listdir(extract_base_path)
+    if len(items) > 0:
+        raise Exception("Extract dir {extract_base_path} has extraenous items: {items}")
 
 def run_test(pool_files, backup_paths, upload_limit):
     for snapshot_path in SNAPSHOT_PATHS:
