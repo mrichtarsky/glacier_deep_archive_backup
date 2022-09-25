@@ -10,6 +10,7 @@ BACKUP_PATHS=(
     "file1.txt"  # Will backup /tank/file1.txt
     "pics"
     "sports/nba"
+    "."          # Will backup the full /tank content (alternative to a * wildcard)
 )
 
 # The S3 bucket where data is stored
