@@ -76,18 +76,24 @@ class Path():
         self.parent = parent
         self.name = name
         self.upload_limit = upload_limit
-        self.files = []
+        self.files = set()
         self.dirs = {}
         self.size = None # Lazily computed
 
     def add_file(self, name, size):
+        if name in ('.', '..', ''):
+            raise BackupException(f"Invalid filename {name}")
+
         if size > self.upload_limit:
             raise BackupException(f"File size exceeds upload limit: {self.get_full_path()}/{name}"
                                   f" (size={size_to_string(size)}, "
                                   f"upload_limit={size_to_string(self.upload_limit)})")
-        self.files.append((name, size))
+        self.files.add((name, size))
 
     def get_dir(self, name):
+        if name in ('.', '..', ''):
+            raise BackupException(f"Invalid dirname {name}")
+
         return self.dirs.setdefault(name, Path(name, self, self.upload_limit))
 
     @lru_cache
@@ -228,32 +234,37 @@ def crawl(snapshot_path, backup_paths, upload_limit):
         sub_num_files = DualCounter('subfiles', 'walk', 'find')
         sub_size_files = DualCounter('subsize', 'walk', 'find')
 
-        def process_file(file_path):
+        def get_node(path):
+            rel_path = path.replace(snapshot_path, '', 1).lstrip('/')
+            node = root_node
+            if len(rel_path) > 0:
+                comps = rel_path.split('/')
+                for comp in comps:
+                    node = node.get_dir(comp)
+            return node
+
+        def process_file(node, file_path):
             info = os.lstat(file_path) # Do not follow symlinks
             sub_num_files.add_counter1(1) # pylint: disable=cell-var-from-loop
             file_size = info[stat.ST_SIZE]
             sub_size_files.add_counter1(file_size) # pylint: disable=cell-var-from-loop
 
-            rel_file_path = file_path.replace(snapshot_path, '', 1).lstrip('/')
-            path, name_ = os.path.split(rel_file_path)
-            node = root_node
-            if len(path) > 0:
-                comps = path.split('/')
-                for comp in comps:
-                    node = node.get_dir(comp)
-            node.add_file(name_, file_size)
+            file_ = os.path.basename(file_path)
+            node.add_file(file_, file_size)
 
         if not os.path.isdir(path):
-            process_file(path)
+            node = get_node(os.path.dirname(path))
+            process_file(node, path)
         else:
             def raise_error(error):
                 raise error
 
             for root, _, files in os.walk(path, topdown=False,
                                           onerror=raise_error, followlinks=False):
+
+                node = get_node(root)
                 for file_ in files:
-                    file_path = os.path.join(root, file_)
-                    process_file(file_path)
+                    process_file(node, os.path.join(root, file_))
 
         update_find_counters(path, sub_num_files, sub_size_files)
 
@@ -279,10 +290,10 @@ def load(state_file, set_writer, backup_paths):
 
 if __name__ == '__main__':
     zfs_pool = os.environ['ZFS_POOL']
-    backup_paths = sys.argv[1:]
-    snapshot_path = os.environ['SNAPSHOT_PATH']
+    backup_paths = tuple(map(os.path.normpath, sys.argv[1:]))
+    snapshot_path = os.path.normpath(os.environ['SNAPSHOT_PATH'])
     state_file = os.environ['STATE_FILE']
-    set_path = os.environ['SET_PATH']
+    set_path = os.path.normpath(os.environ['SET_PATH'])
     upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
 
     # Save state after crawling file system, so can be resumed later
