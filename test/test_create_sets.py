@@ -36,7 +36,7 @@ def create_files(items):
             with open(os.path.join(POOL_PATH, item_path), 'wt') as f:
                 f.write('x' * size)
 
-def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_limit):
+def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_limit): # pylint: disable=too-many-branches
     for item in os.listdir(WORK_PATH):
         shutil.rmtree(os.path.join(WORK_PATH, item), ignore_errors=True)
     os.makedirs(POOL_PATH)
