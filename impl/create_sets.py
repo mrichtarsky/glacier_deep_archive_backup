@@ -12,6 +12,7 @@ SNAPSHOT_PATH is where the ZFS snapshot is mounted.
 Sets are processed later by upload_sets.py.
 '''
 
+from functools import lru_cache
 from impl.tools import BackupException, size_to_string
 
 import binpacking
@@ -29,14 +30,27 @@ class SetWriter():
         self.set_path = set_path
         self.zfs_pool = zfs_pool
 
-    def _make_archive_name(self, path):
-        name = path.replace(self.snapshot_path, self.zfs_pool)
+    def _make_archive_name(self, items):
+        if len(items) == 1:
+            prefix = items[0]
+        else:
+            items.sort()
+            max_prefix_length = min(len(items[0]), len(items[-1]))
+
+            i = 0
+            while i < max_prefix_length and items[0][i] == items[-1][i]:
+                i += 1
+
+            prefix = items[0][0:i]
+
+        name = prefix.replace(self.snapshot_path, self.zfs_pool)
         name = re.sub('[^a-zA-Z0-9_-]', '_', name)
         return name
 
-    def write_set(self, path, items, size):
-        print(f"Set: path={path}, {len(items)} item(s), {size_to_string(size)}")
-        archive_name = self._make_archive_name(path)
+    def write_set(self, items, size):
+        print(f"Set: {len(items)} item(s), {size_to_string(size)}")
+        archive_name = self._make_archive_name(items)
+        print(f"  Archive name: {archive_name}")
 
         counter = 0
         while True:
@@ -70,6 +84,13 @@ class Path():
     def get_dir(self, name):
         return self.dirs.setdefault(name, Path(name, self, self.upload_limit))
 
+    @lru_cache
+    def get_snapshot_path(self):
+        node = self
+        while node.parent is not None:
+            node = node.parent
+        return node.name
+
     def get_full_path(self):
         if self.parent is None:
             return self.name
@@ -94,28 +115,55 @@ class Path():
             out += '\n'.join(map(lambda file_: os.path.join(path, file_[0]), self.files)) + '\n'
         return out
 
-    def create_backup_sets(self, set_writer):
+    def _is_inside_backup_paths(self, backup_paths, path):
+        snapshot_path = self.get_snapshot_path()
+        rel_path = os.path.relpath(path, snapshot_path)
+        for backup_path in backup_paths:
+            exact_match = backup_path == rel_path # File or path
+            path_prefix_match = rel_path.startswith(os.path.join(backup_path, ''))
+            if exact_match or path_prefix_match:
+                return True
+        return False
+
+    def create_backup_sets(self, set_writer, backup_paths):
+        items = []
+
         path = self.get_full_path()
         size = self.get_size()
-        is_snapshot_path = self.parent is None
-        if size <= self.upload_limit and not is_snapshot_path:
-            # When the snapshot_path fits, we still cannot simply zip it up fully
-            # since only a subset of entries may be in the backup_paths.
-            # But we may do so when we are in a subdirectory.
-            set_writer.write_set(path, (path, ), size)
+
+        # When the path fits, we still cannot simply zip it up fully
+        # since only a subset of entries may be in the backup_paths.
+        if size <= self.upload_limit and self._is_inside_backup_paths(backup_paths, path):
+            items.append((path, size))
         else:
-            items = copy.copy(self.files)
+            for file_, size in self.files:
+                file_path = os.path.join(path, file_)
+                if self._is_inside_backup_paths(backup_paths, file_path):
+                    items.append((file_path, size))
             for dir_ in self.dirs.values():
                 if dir_.get_size() > self.upload_limit:
-                    dir_.create_backup_sets(set_writer)
+                    dir_items = dir_.create_backup_sets(set_writer, backup_paths)
+                    items.extend(dir_items)
                 else:
-                    items.append((dir_.name, dir_.get_size()))
-            if len(items) > 0:
-                bins = binpacking.to_constant_volume(items, self.upload_limit, weight_pos=1)
-                for bin_ in bins:
-                    size = sum(file_[1] for file_ in bin_)
-                    items = [ os.path.join(path, item[0]) for item in bin_ ]
-                    set_writer.write_set(path, items, size)
+                    dir_path = os.path.join(path, dir_.name)
+                    if self._is_inside_backup_paths(backup_paths, dir_path):
+                        items.append((dir_path, dir_.get_size()))
+                    else:
+                        dir_items = dir_.create_backup_sets(set_writer, backup_paths)
+                        items.extend(dir_items)
+
+
+        if self.parent is not None:
+            return items
+
+        if len(items) > 0:
+            bins = binpacking.to_constant_volume(items, self.upload_limit, weight_pos=1)
+            for bin_ in bins:
+                size = sum(item_[1] for item_ in bin_)
+                items = [ item[0] for item in bin_ ]
+                set_writer.write_set(items, size)
+
+        return None
 
 class DualCounter:
     def __init__(self, title, name1, name2):
@@ -215,11 +263,11 @@ def crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file):
     with open(state_file, 'wb') as f:
         pickle.dump(root_node, f)
 
-def load(state_file, set_writer):
+def load(state_file, set_writer, backup_paths):
     with open(state_file, 'rb') as f:
         root_node = pickle.load(f)
     print('Total size of backed up files:', size_to_string(root_node.get_size()))
-    root_node.create_backup_sets(set_writer)
+    root_node.create_backup_sets(set_writer, backup_paths)
 
 
 if __name__ == '__main__':
@@ -233,4 +281,4 @@ if __name__ == '__main__':
     # Save state after crawling file system, so can be resumed later
     crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file)
     set_writer = SetWriter(snapshot_path, set_path, zfs_pool)
-    load(state_file, set_writer)
+    load(state_file, set_writer, backup_paths)

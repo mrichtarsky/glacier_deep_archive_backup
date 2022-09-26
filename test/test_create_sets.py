@@ -47,14 +47,14 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_
     subprocess.run(('sudo', 'ln', '-s', POOL_PATH, snapshot_path), check=True)
     set_writer = SetWriter(snapshot_path, SET_PATH, ZFS_POOL)
     root_node = crawl(snapshot_path, backup_paths, upload_limit)
-    root_node.create_backup_sets(set_writer)
+    root_node.create_backup_sets(set_writer, backup_paths)
 
     set_files = get_set_files(SET_PATH)
     if len(set_files) == 0:
         if len(backup_paths) == 0:
             # Nothing else to verify, backup set is empty
             return
-        raise Exception('backup_paths not empy, but no set files found')
+        raise Exception('backup_paths not empty, but no set files found')
 
     archive_paths = []
     for set_file in set_files:
@@ -84,9 +84,29 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_
             shutil.rmtree(extract_backup_path)
 
     # Condition 2: No extra files
-    items = os.listdir(extract_base_path)
-    if len(items) > 0:
-        raise Exception("Extract dir {extract_base_path} has extraenous items: {items}")
+    extra_files = []
+    extra_dirs = []
+
+    def raise_error(error):
+        raise error
+
+    for root, dirs, files in os.walk(extract_base_path, topdown=False,
+                                     onerror=raise_error, followlinks=False):
+        for file_ in files:
+            extra_files.append(os.path.relpath(os.path.join(root, file_), extract_base_path))
+        for dir_ in dirs:
+            rel_path = os.path.relpath(os.path.join(root, dir_), extract_base_path)
+            is_parent_dir = False
+            for backup_path in backup_paths:
+                if backup_path.startswith(os.path.join(rel_path, '')):
+                    is_parent_dir = True
+                    break
+            if not is_parent_dir:
+                extra_dirs.append(rel_path)
+
+    if len(extra_files) > 0 or len(extra_dirs) > 0:
+        raise Exception(f"Extract dir {extract_base_path} has extraneous items:"
+                        f" files={extra_files}, dirs={extra_dirs}")
 
 def run_test(pool_files, backup_paths, upload_limit):
     for snapshot_path in SNAPSHOT_PATHS:
@@ -178,6 +198,21 @@ def test_file_size_exceeds_upload_limit_throws():
     except BackupException:
         pass
 
+def test_path_fits_but_only_one_file_included():
+    pool_files = (
+        ('a/b/1', SIZE_SMALL),
+        ('a/b/2', SIZE_SMALL),
+    )
+
+    run_test(pool_files, ('a/b/1',), SIZE_SMALL * 2)
+
+def test_path_fits_but_only_one_subdir_included():
+    pool_files = (
+        ('a/b/1', SIZE_SMALL),
+        ('a/c/2', SIZE_SMALL),
+    )
+
+    run_test(pool_files, ('a/b',), SIZE_SMALL * 2)
 
 def do_test_fuzz():
     MAX_FILES = 1000
