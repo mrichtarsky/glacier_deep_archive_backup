@@ -20,4 +20,5 @@ if [[ ! -f state/resumable ]]; then
     exit 1
 fi
 
-unbuffer impl/do_backup_to_aws.sh resume "$SETTINGS" "$TIMESTAMP" 2>&1 | tee logs/backup_resume.log
+stdbuf -oL -eL impl/do_backup_to_aws.sh resume "$SETTINGS" "$TIMESTAMP" 2>&1 | tee -i logs/backup_resume.log
+echo "OK"

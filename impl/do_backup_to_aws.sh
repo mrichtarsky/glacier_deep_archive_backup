@@ -38,8 +38,11 @@ mkdir -p "$BUFFER_PATH"
 function cleanup()
 {
     rm -rf "$BUFFER_PATH"
-    if [[ ! -f state/resumable ]]; then
-        echo "Resume not possible, destroying snapshot $SNAPSHOT"
+    if [[ -f state/resumable ]]; then
+        echo
+        echo "Error or cancel during processing. Keeping snapshot mounted at $SNAPSHOT_PATH. Please check for any errors that need to be fixed and run './backup_resume $SETTINGS $TIMESTAMP' to retry."
+    else
+        echo "Destroying snapshot $SNAPSHOT"
         sudo umount "$SNAPSHOT_PATH"
         sudo zfs destroy "$SNAPSHOT"
     fi
@@ -62,13 +65,7 @@ fi
 touch state/resumable
 
 export BUFFER_PATH S3_BUCKET TIMESTAMP
-set +e
-if python impl/upload_sets.py; then
-    set -e
-    rm state/resumable
-    echo "Completed backup, timestamp $TIMESTAMP"
-    echo "OK"
-else
-    echo
-    echo "Error during processing. Keeping snapshot mounted at $SNAPSHOT_PATH. Please check for any errors that need to be fixed and run './backup_resume $SETTINGS $TIMESTAMP' to retry."
-fi
+python impl/upload_sets.py
+rm state/resumable
+
+echo "Completed backup (config=$SETTINGS, timestamp=$TIMESTAMP)"

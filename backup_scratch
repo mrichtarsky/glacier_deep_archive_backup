@@ -14,4 +14,5 @@ export PYTHONPATH+=:$ROOT
 pushd "$ROOT" >/dev/null
 trap 'popd >/dev/null' EXIT
 
-unbuffer impl/do_backup_to_aws.sh scratch "$SETTINGS" 2>&1 | tee logs/backup_scratch.log
+stdbuf -oL -eL impl/do_backup_to_aws.sh scratch "$SETTINGS" 2>&1 | tee -i logs/backup_scratch.log
+echo "OK"

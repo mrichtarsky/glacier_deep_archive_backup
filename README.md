@@ -29,7 +29,6 @@ The script relies on the ZFS file system's snapshot capabilities to provide a co
 - `tar` with `zstd` support
 - `gpg`
 - `pip install binpacking`
-- `unbuffer` (part of `expect` package, Ubuntu/Debian: `sudo apt install expect`)
 - `pip install pytest` if you want to run the tests
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 - An AWS account and an S3 bucket. Follow [these instructions](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-prereqs.html) to set up an account and put the credentials in `~/.aws/credentials`. The file should look similar to this:

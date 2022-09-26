@@ -28,4 +28,4 @@ mkdir -p "$BUFFER_PATH"
 
 export BUFFER_PATH EXTRACT_PATH RESTORE_TIER S3_BUCKET TIMESTAMP
 
-unbuffer python impl/do_restore.py 2>&1 | tee logs/restore.log
+stdbuf -oL -eL python impl/do_restore.py 2>&1 | tee -i logs/restore.log
