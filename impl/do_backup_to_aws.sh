@@ -9,7 +9,7 @@ if [[ "$MODE" == scratch ]]; then
     echo "Scratch backup, timestamp: $TIMESTAMP (needed if resume is necessary)"
 else
     echo "Resuming"
-    TIMESTAMP=$2
+    TIMESTAMP=$3
 fi
 
 # shellcheck disable=SC1090
@@ -25,21 +25,10 @@ SET_PATH=state/sets
 STATE_FILE=state/fs.state
 
 if [[ "$MODE" != resume ]]; then
-    sudo zfs snapshot "$SNAPSHOT"
-
     rm -f state/resumable
-    rm -f "$SET_PATH"/*
-    rm -f "$STATE_FILE"
-
-    mkdir -p "$SET_PATH"
+    sudo zfs snapshot "$SNAPSHOT"
     sudo mkdir -p "$SNAPSHOT_PATH"
     sudo mount -t zfs -o ro "$SNAPSHOT" "$SNAPSHOT_PATH"
-fi
-
-export SET_PATH SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB ZFS_POOL
-
-if [[ "$MODE" != resume ]]; then
-    python impl/create_sets.py "${BACKUP_PATHS[@]}"
 fi
 
 BUFFER_PATH="$BUFFER_PATH_BASE/backup_aws_buffer"
@@ -49,17 +38,34 @@ mkdir -p "$BUFFER_PATH"
 function cleanup()
 {
     rm -rf "$BUFFER_PATH"
+    if [[ ! -f state/resumable ]]; then
+        echo "Resume not possible, destroying snapshot $SNAPSHOT"
+        sudo umount "$SNAPSHOT_PATH"
+        sudo zfs destroy "$SNAPSHOT"
+    fi
 }
 
 trap cleanup EXIT
 
+if [[ "$MODE" != resume ]]; then
+    rm -f "$SET_PATH"/*
+    mkdir -p "$SET_PATH"
+
+    rm -f "$STATE_FILE"
+fi
+
+export SET_PATH SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB ZFS_POOL
+
+if [[ "$MODE" != resume ]]; then
+    python impl/create_sets.py "${BACKUP_PATHS[@]}"
+fi
+touch state/resumable
+
 export BUFFER_PATH S3_BUCKET TIMESTAMP
 set +e
-touch state/resumable
 if python impl/upload_sets.py; then
     set -e
-    sudo umount "$SNAPSHOT_PATH"
-    sudo zfs destroy "$SNAPSHOT"
+    rm state/resumable
     echo "Completed backup, timestamp $TIMESTAMP"
     echo "OK"
 else
