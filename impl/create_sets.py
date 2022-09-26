@@ -13,10 +13,11 @@ Sets are processed later by upload_sets.py.
 '''
 
 from functools import lru_cache
-from impl.tools import BackupException, size_to_string
+from impl.tools import BackupException, make_info_filename, size_to_string
 
 import binpacking
 import copy
+import json
 import os
 import pickle
 import re
@@ -54,16 +55,21 @@ class SetWriter():
 
         counter = 0
         while True:
-            set_fileName = os.path.join(self.set_path,
-                                        f"{archive_name}_{counter:03d}")
-            if not os.path.exists(set_fileName):
+            list_filename = os.path.join(self.set_path,
+                                        f"{archive_name}_{counter:03d}.list")
+            if not os.path.exists(list_filename):
                 break
             counter += 1
 
-        with open(set_fileName, 'wt') as set_file:
+        with open(list_filename, 'wt') as list_file:
             for item in items:
                 print('  ', item)
-                print(item, file=set_file)
+                print(item, file=list_file)
+
+        info_filename = make_info_filename(list_filename)
+        with open(info_filename, 'wt') as info_file:
+            info = { 'size_bytes': size }
+            json.dump(info, info_file)
 
 class Path():
     def __init__(self, name, parent, upload_limit):

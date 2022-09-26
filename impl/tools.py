@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 
 
@@ -11,13 +12,13 @@ def size_to_string(size):
     GiB = 1024*MiB
     TiB = 1024*GiB
     if size >= TiB:
-        return f"{size / TiB:.2f} TiB"
+        return f"{size / TiB:.2f}TiB"
     if size >= GiB:
-        return f"{size / GiB:.2f} GiB"
+        return f"{size / GiB:.2f}GiB"
     if size >= MiB:
-        return f"{size / MiB:.2f} MiB"
+        return f"{size / MiB:.2f}MiB"
     if size >= KiB:
-        return f"{size / KiB:.2f} KiB"
+        return f"{size / KiB:.2f}KiB"
     return f"{size} B"
 
 def clean_multipart_uploads(s3_bucket):
@@ -31,3 +32,7 @@ def clean_multipart_uploads(s3_bucket):
                    s3_bucket, '--key', upload['Key'], '--upload-id',
                    upload['UploadId'])
             subprocess.run(cmd, check=True)
+
+def make_info_filename(list_file):
+    info_file = os.path.splitext(list_file)[0] + '.info'
+    return info_file

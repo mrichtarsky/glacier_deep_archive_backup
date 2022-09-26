@@ -130,6 +130,19 @@ Should you wish to only restore some files to save time or money you can follow 
 
 - No file splitting: The largest file must fit into `UPLOAD_LIMIT_MB`.
 
+- There is a progress display which works as follows:
+
+    ```
+    Elapsed: 8m, Archived: 4.69GiB/6.43GiB (72.9%, 9.20MiB/s), Uploaded: 4.39GiB/6.43GiB (68.3%, 1.66MiB/s), ETA: 3m - 4m
+    ```
+
+    - Uploaded bytes are gross (before compression)
+    - Upload speed is for net uploaded bytes (after compression)
+    - For ETA, a range is estimated:
+      - The lower bound assumes that the achieved compression rate remains the same for the remaining files
+      - The upper bound assumes that compression is 1x for the remaining files
+      - It's possible that the lower bound is still too high when the remaining files compress better
+
 - Backup files are not deleted in your S3 bucket, you need to take care of this yourself
 
 - Discussed on [Hacker News](https://news.ycombinator.com/item?id=32864052)
@@ -150,6 +163,5 @@ Should you wish to only restore some files to save time or money you can follow 
 - Just append to one logfile
 - Store timestamp and config for resume
 - Do away with scratch/resume split and just pick off where we left off?
-- Estimate time
-- Show net, gross size
 - Option for quieter output, log full output to file
+- Option to retrieve file lists only

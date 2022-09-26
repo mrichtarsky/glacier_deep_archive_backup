@@ -2,7 +2,7 @@
 
 from impl.create_sets import crawl, SetWriter
 from impl.tools import BackupException
-from impl.upload_sets import build_archive, get_set_files
+from impl.upload_sets import build_archive, get_list_files
 
 import os
 import pathlib
@@ -49,16 +49,16 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_
     root_node = crawl(snapshot_path, backup_paths, upload_limit)
     root_node.create_backup_sets(set_writer, backup_paths)
 
-    set_files = get_set_files(SET_PATH)
-    if len(set_files) == 0:
+    list_files = get_list_files(SET_PATH)
+    if len(list_files) == 0:
         if len(backup_paths) == 0:
             # Nothing else to verify, backup set is empty
             return
         raise Exception('backup_paths not empty, but no set files found')
 
     archive_paths = []
-    for set_file in set_files:
-        _, archive_path = build_archive(set_file, WORK_PATH)
+    for list_file in list_files:
+        _, archive_path = build_archive(list_file, WORK_PATH)
         archive_paths.append(archive_path)
 
     extract_path = os.path.join(WORK_PATH, 'extract')

@@ -1,53 +1,133 @@
 #!/usr/bin/env python
 
-from impl.tools import BackupException, clean_multipart_uploads, size_to_string
+from impl.tools import BackupException, clean_multipart_uploads, make_info_filename, size_to_string
 
+import json
 import os
 import shutil
 import subprocess
 import sys
+import time
 
-def get_set_files(set_path):
-    set_files = []
+
+def get_list_files(set_path):
+    list_files = []
 
     def raise_error(error):
         raise error
 
     for root, _, files in os.walk(set_path, topdown=False, onerror=raise_error, followlinks=False):
         for file_ in files:
-            set_file = os.path.join(root, file_)
-            set_files.append(set_file)
+            if os.path.splitext(file_)[1] == '.list':
+                list_file = os.path.join(root, file_)
+                list_files.append(list_file)
 
-    set_files.sort()
+    list_files.sort()
 
-    return set_files
+    return list_files
 
-def build_archive(set_file, buffer_path):
-    archive_name = f"{os.path.basename(set_file)}.tar.zstd.gpg"
+def build_archive(list_file, buffer_path):
+    archive_name = f"{os.path.basename(list_file)}.tar.zstd.gpg"
     buffer_file = os.path.join(buffer_path, archive_name)
-    cmd = ('impl/build_archive.sh', set_file, buffer_file)
+    cmd = ('impl/build_archive.sh', list_file, buffer_file)
     print('Running', ' '.join(cmd))
     subprocess.run(cmd, check=True)
 
     return archive_name, buffer_file
 
+def get_info_for(list_file):
+    info_file = make_info_filename(list_file)
+    with open(info_file, 'rt') as info_file:
+        info = json.load(info_file)
+        return info
+
 def package_and_upload(set_path, buffer_path, s3_bucket, timestamp):
     num_errors = 0
-    set_files = get_set_files(set_path)
+    list_files = get_list_files(set_path)
 
-    for index, set_file in enumerate(set_files, 1):
-        print(f"{index}/{len(set_files)}: Packing set {set_file}")
-        archive_name, archive_file = build_archive(set_file, buffer_path)
+    total_size_bytes = 0
+    for list_file in list_files:
+        info = get_info_for(list_file)
+        total_size_bytes += info['size_bytes']
 
-        stem = os.path.basename(set_file)
-        set_set_file = os.path.join(buffer_path, f"{stem}_contents.txt")
-        with open(set_set_file, 'wt') as f:
-            print(set_file, file=f)
-        contents_archive_name, contents_archive_file = build_archive(set_set_file, buffer_path)
+    archived_bytes = 0
+    gross_uploaded_bytes = 0 # uncompressed
+    net_uploaded_bytes = 0
+    archive_time_sec = 0
+    upload_time_sec = 0
+    start_time_sec = time.time()
+
+    def seconds_to_days(seconds):
+        days, remainder = divmod(seconds, 86400)
+        hours, remainder = divmod(remainder, 3600)
+        minutes, _ = divmod(remainder, 60)
+        comps = []
+        if int(days) > 0:
+            comps.append(f"{int(days)}d")
+        if int(hours) > 0:
+            comps.append(f"{int(hours)}h")
+        comps.append(f"{int(minutes)}m")
+        return ' '.join(comps)
+
+    def print_status():
+        elapsed_time_sec = time.time() - start_time_sec
+        active_str = seconds_to_days(elapsed_time_sec)
+        archived_str = f"{size_to_string(archived_bytes)}/{size_to_string(total_size_bytes)}"
+        archived_perc = 100 * archived_bytes / total_size_bytes
+        if archive_time_sec > 0:
+            archived_per_sec_str = f"{size_to_string(archived_bytes / archive_time_sec)}"
+        else:
+            archived_per_sec_str = '? MiB'
+        uploaded_str = f"{size_to_string(gross_uploaded_bytes)}/{size_to_string(total_size_bytes)}"
+        upload_perc = 100 * gross_uploaded_bytes / total_size_bytes
+        if upload_time_sec > 0:
+            upload_per_sec_str = f"{size_to_string(net_uploaded_bytes / upload_time_sec)}"
+        else:
+            upload_per_sec_str = '? MiB'
+        if (archived_bytes > 0 and archive_time_sec > 0 and upload_time_sec > 0 and
+                gross_uploaded_bytes > 0 and net_uploaded_bytes > 0):
+            eta_archiving_sec = (total_size_bytes - archived_bytes) / (archived_bytes / archive_time_sec)
+            gross_remaining_upload_bytes = total_size_bytes - gross_uploaded_bytes
+            # Pessimistic: Remaining compression is 1x
+            max_eta_upload_sec = gross_remaining_upload_bytes / (net_uploaded_bytes / upload_time_sec)
+            # Optimistic: Compression ratio is constant as for data before
+            min_eta_upload_sec = max_eta_upload_sec * (net_uploaded_bytes / gross_uploaded_bytes)
+            min_eta_str = seconds_to_days(eta_archiving_sec + min_eta_upload_sec)
+            max_eta_str = seconds_to_days(eta_archiving_sec + max_eta_upload_sec)
+        else:
+            min_eta_str = '?'
+            max_eta_str = '?'
+        if min_eta_str == max_eta_str:
+            eta_str = min_eta_str
+        else:
+            eta_str = f"{min_eta_str} - {max_eta_str}"
+
+        msg = (f"Elapsed: {active_str}, Archived: {archived_str} ({archived_perc:.1f}%"
+               f", {archived_per_sec_str}/s), Uploaded: {uploaded_str} ({upload_perc:.1f}%"
+               f", {upload_per_sec_str}/s), ETA: {eta_str}")
+
+        print(msg)
+
+    for index, list_file in enumerate(list_files, 1):
+        print(f"{index}/{len(list_files)}: Packing set {list_file}")
+
+        t0 = time.time()
+        archive_name, archive_file = build_archive(list_file, buffer_path)
+        archive_time_sec += time.time() - t0
+
+        info = get_info_for(list_file)
+        archived_bytes += info['size_bytes']
+        print_status()
+
+        stem = os.path.basename(list_file)
+        list_list_file = os.path.join(buffer_path, f"{stem}_contents.txt")
+        with open(list_list_file, 'wt') as f:
+            print(list_file, file=f)
+        contents_archive_name, contents_archive_file = build_archive(list_list_file, buffer_path)
 
         upload_success = False
         for i in range(3):
-            print(f"{index}/{len(set_files)}: Uploading {archive_name}, attempt {i+1}")
+            print(f"{index}/{len(list_files)}: Uploading {archive_name}, attempt {i+1}")
 
             def do_upload(file_, archive_name, deep_archive):
                 bucket_path = f"s3://{s3_bucket}/{timestamp}/{archive_name}"
@@ -55,22 +135,30 @@ def package_and_upload(set_path, buffer_path, s3_bucket, timestamp):
                 if deep_archive:
                     cmd.extend(['--storage-class', 'DEEP_ARCHIVE'])
                 print('Running', cmd)
+                t0 = time.time()
                 subprocess.run(cmd, check=True)
+                return time.time() - t0
 
             try:
                 do_upload(contents_archive_file, contents_archive_name, deep_archive=False)
-                do_upload(archive_file, archive_name, deep_archive=True)
+                file_upload_time_sec = do_upload(archive_file, archive_name, deep_archive=True)
 
                 upload_success = True
+                net_uploaded_bytes += os.path.getsize(archive_file)
+                gross_uploaded_bytes += info['size_bytes']
+                upload_time_sec += file_upload_time_sec
                 break
             except subprocess.CalledProcessError as e:
                 print('Error during upload: ', e)
+            finally:
+                print_status()
 
         # Delete archive in any case, retry will recreate it and we need the space
         os.unlink(archive_file)
         if upload_success:
-            os.unlink(set_file)
-            os.unlink(set_set_file)
+            os.unlink(list_file)
+            os.unlink(make_info_filename(list_file))
+            os.unlink(list_list_file)
             os.unlink(contents_archive_file)
         else:
             num_errors += 1
