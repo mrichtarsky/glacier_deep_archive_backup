@@ -28,11 +28,11 @@ def get_list_files(set_path):
 
     return list_files
 
-def build_archive(list_file, buffer_path):
+def build_archive(snapshot_path, list_file, buffer_path):
     stem = os.path.splitext(os.path.basename(list_file))[0]
     archive_name = f"{stem}.tar.zstd.gpg"
     buffer_file = os.path.join(buffer_path, archive_name)
-    cmd = ('impl/build_archive.sh', list_file, buffer_file)
+    cmd = ('impl/build_archive.sh', snapshot_path, list_file, buffer_file)
     print('Running', ' '.join(cmd))
     subprocess.run(cmd, check=True)
 
@@ -44,7 +44,7 @@ def get_info_for(list_file):
         info = json.load(info_file)
         return info
 
-def package_and_upload(set_path, buffer_path, s3_bucket, timestamp): # pylint: disable=too-many-statements
+def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, timestamp): # pylint: disable=too-many-statements
     num_errors = 0
     list_files = get_list_files(set_path)
 
@@ -121,7 +121,7 @@ def package_and_upload(set_path, buffer_path, s3_bucket, timestamp): # pylint: d
         print(f"{index}/{len(list_files)}: Packing set {list_file}")
 
         t0 = time.time()
-        archive_name, archive_file = build_archive(list_file, buffer_path)
+        archive_name, archive_file = build_archive(snapshot_path, list_file, buffer_path)
         archive_time_sec += time.time() - t0
 
         info = get_info_for(list_file)
@@ -129,10 +129,13 @@ def package_and_upload(set_path, buffer_path, s3_bucket, timestamp): # pylint: d
         print_status()
 
         stem = os.path.basename(list_file)
-        list_list_file = os.path.join(buffer_path, f"{stem}_contents.txt")
-        with open(list_list_file, 'wt') as f:
+        list_list_filename = f"{stem}_contents.txt"
+        list_list_filepath = os.path.join(buffer_path, list_list_filename)
+        with open(list_list_filepath, 'wt') as f:
             print(list_file, file=f)
-        contents_archive_name, contents_archive_file = build_archive(list_list_file, buffer_path)
+        contents_archive_name, contents_archive_file = build_archive('.',
+                                                                     list_list_filepath,
+                                                                     buffer_path)
 
         upload_success = False
         for i in range(3):
@@ -167,7 +170,7 @@ def package_and_upload(set_path, buffer_path, s3_bucket, timestamp): # pylint: d
         if upload_success:
             os.unlink(list_file)
             os.unlink(make_info_filename(list_file))
-            os.unlink(list_list_file)
+            os.unlink(list_list_filepath)
             os.unlink(contents_archive_file)
         else:
             num_errors += 1
@@ -175,6 +178,7 @@ def package_and_upload(set_path, buffer_path, s3_bucket, timestamp): # pylint: d
     return num_errors
 
 if __name__ == '__main__':
+    snapshot_path = os.path.normpath(os.environ['SNAPSHOT_PATH'])
     set_path = os.environ['SET_PATH']
     buffer_path = os.environ['BUFFER_PATH']
     s3_bucket = os.environ['S3_BUCKET']
@@ -188,7 +192,7 @@ if __name__ == '__main__':
                               f"(upload_limit={size_to_string(upload_limit)}, "
                               f"bytes_free={size_to_string(bytes_free)})")
 
-    num_errors = package_and_upload(set_path, buffer_path, s3_bucket, timestamp)
+    num_errors = package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, timestamp)
 
     # During upload, files will be temporarily stored in S3 standard storage.
     # Failed uploads leave orphans behind, which will cause quite high costs.

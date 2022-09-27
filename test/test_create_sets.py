@@ -5,7 +5,6 @@ from impl.tools import BackupException
 from impl.upload_sets import build_archive, get_list_files
 
 import os
-import pathlib
 import pickle
 import pytest
 import random
@@ -69,7 +68,7 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
 
     archive_paths = []
     for list_file in list_files:
-        _, archive_path = build_archive(list_file, WORK_PATH)
+        _, archive_path = build_archive(snapshot_path, list_file, WORK_PATH)
         archive_paths.append(archive_path)
 
     extract_path = os.path.join(WORK_PATH, 'extract')
@@ -80,14 +79,11 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
         cmd = (os.path.join(SCRIPT_PATH, '..', 'extract_archive'), archive_path, extract_path)
         subprocess.run(cmd, check=True)
 
-    relative_snapshot_path = pathlib.Path(snapshot_path).relative_to('/')
-    extract_base_path = os.path.join(extract_path, relative_snapshot_path)
-
     # Condition 1: All backup paths must be identical
     extract_backup_paths = set()
     for backup_path in backup_paths:
         snapshot_backup_path = os.path.join(snapshot_path, backup_path)
-        extract_backup_path = os.path.join(extract_base_path, backup_path)
+        extract_backup_path = os.path.join(extract_path, backup_path)
         cmd = ('diff', '-r', snapshot_backup_path, extract_backup_path)
         print(' '.join(cmd))
         subprocess.run(cmd, check=True)
@@ -108,12 +104,12 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
     def raise_error(error):
         raise error
 
-    for root, dirs, files in os.walk(extract_base_path, topdown=False,
+    for root, dirs, files in os.walk(extract_path, topdown=False,
                                      onerror=raise_error, followlinks=False):
         for file_ in files:
-            extra_files.append(os.path.relpath(os.path.join(root, file_), extract_base_path))
+            extra_files.append(os.path.relpath(os.path.join(root, file_), extract_path))
         for dir_ in dirs:
-            rel_path = os.path.relpath(os.path.join(root, dir_), extract_base_path)
+            rel_path = os.path.relpath(os.path.join(root, dir_), extract_path)
             is_parent_dir = False
             for backup_path in backup_paths:
                 if backup_path.startswith(os.path.join(rel_path, '')):
@@ -123,7 +119,7 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
                 extra_dirs.append(rel_path)
 
     if len(extra_files) > 0 or len(extra_dirs) > 0:
-        raise Exception(f"Extract dir {extract_base_path} has extraneous items:"
+        raise Exception(f"Extract dir {extract_path} has extraneous items:"
                         f" files={extra_files}, dirs={extra_dirs}")
 
 def run_test(pool_files, backup_paths, upload_limit, num_expected_sets=None, is_fuzz_run=False):

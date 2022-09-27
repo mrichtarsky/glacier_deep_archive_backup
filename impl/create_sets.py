@@ -65,6 +65,7 @@ class SetWriter():
 
         with open(list_filename, 'wt') as list_file:
             for item in items:
+                item = os.path.relpath(item, self.snapshot_path)
                 print('  ', item)
                 print(item, file=list_file)
 
