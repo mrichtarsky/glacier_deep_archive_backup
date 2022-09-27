@@ -53,7 +53,8 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, timestam
         info = get_info_for(list_file)
         total_size_bytes += info['size_bytes']
 
-    archived_bytes = 0
+    archived_bytes = 0 # uncompressed
+    archive_size_bytes = 0 # compressed
     gross_uploaded_bytes = 0 # uncompressed
     net_uploaded_bytes = 0
     archive_time_sec = 0
@@ -91,6 +92,10 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, timestam
             upload_per_sec_str = f"{size_to_string(net_uploaded_bytes / upload_time_sec)}"
         else:
             upload_per_sec_str = '? MiB'
+        if archive_size_bytes > 0:
+            ratio_str = f"{archived_bytes / archive_size_bytes:.1f}x"
+        else:
+            ratio_str = '?'
         if (archived_bytes > 0 and archive_time_sec > 0 and upload_time_sec > 0 and
                 gross_uploaded_bytes > 0 and net_uploaded_bytes > 0):
             archived_bytes_per_sec = (archived_bytes / archive_time_sec)
@@ -113,7 +118,7 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, timestam
 
         msg = (f"Elapsed: {active_str}, Archived: {archived_str} ({archived_perc:.1f}%"
                f", {archived_per_sec_str}/s), Uploaded: {uploaded_str} ({upload_perc:.1f}%"
-               f", {upload_per_sec_str}/s), ETA: {eta_str}")
+               f", {upload_per_sec_str}/s), Ratio: {ratio_str}, ETA: {eta_str}")
 
         print(msg)
 
@@ -123,6 +128,7 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, timestam
         t0 = time.time()
         archive_name, archive_file = build_archive(snapshot_path, list_file, buffer_path)
         archive_time_sec += time.time() - t0
+        archive_size_bytes += os.path.getsize(archive_file)
 
         info = get_info_for(list_file)
         archived_bytes += info['size_bytes']
