@@ -40,7 +40,7 @@ def create_files(items):
             with open(os.path.join(POOL_PATH, item_path), 'wt') as f:
                 f.write('x' * size)
 
-def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylint: disable=too-many-branches, too-many-statements
+def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylint: disable=too-many-statements
                                 upload_limit, num_expected_sets):
     snapshot_path = os.path.normpath(snapshot_path)
     backup_paths = tuple(map(os.path.normpath, backup_paths))

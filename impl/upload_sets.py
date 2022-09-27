@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
-from impl.tools import BackupException, clean_multipart_uploads, make_info_filename, size_to_string, size_to_string_factor, size_to_unit
+from impl.tools import (BackupException, clean_multipart_uploads,
+                        make_info_filename, size_to_string,
+                        size_to_string_factor, size_to_unit)
 
 import json
 import os

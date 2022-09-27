@@ -11,6 +11,7 @@ IGNORES=(
     -d too-many-locals
     -d unspecified-encoding
     -d wrong-import-order
+    -d too-many-branches
 )
 
 # shellcheck disable=SC2046

@@ -50,7 +50,8 @@ class SetWriter():
         return name
 
     def write_set(self, items, size, num_dirs, num_files):
-        print(f"Set: {len(items)} path(s), {size_to_string(size)}, {num_dirs} dir(s), {num_files} file(s)")
+        print(f"Set: {len(items)} path(s), {size_to_string(size)}"
+              f", {num_dirs} dir(s), {num_files} file(s)")
         archive_name = self._make_archive_name(items)
         print(f"  Archive name: {archive_name}")
 
