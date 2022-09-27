@@ -3,6 +3,6 @@ set -euxo pipefail
 
 misc/pylint.sh
 misc/shellcheck.sh
-test/test.sh
+test/test_quick.sh
 
 echo 'OK'

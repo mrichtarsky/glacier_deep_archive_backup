@@ -314,16 +314,20 @@ def do_test_fuzz():
 
     run_test(pool_files, backup_paths, upload_limit, is_fuzz_run=True)
 
-@pytest.mark.longrunner
-def test_fuzz():
-    NUM_RUNS = 100
-
+def do_test_fuzz_n(num_runs):
     t1 = time.time()
-    for _ in range(NUM_RUNS):
+    for _ in range(num_runs):
         do_test_fuzz()
-    print(f"{NUM_RUNS} runs took {time.time()-t1} sec")
+    print(f"{num_runs} runs took {time.time()-t1} sec")
 
-    return NUM_RUNS
+    return num_runs
+
+def test_fuzz_quick():
+    return do_test_fuzz_n(2)
+
+@pytest.mark.longrunner
+def test_fuzz_long():
+    return do_test_fuzz_n(100)
 
 if __name__ == '__main__':
     if '--repro' in sys.argv:
@@ -336,7 +340,7 @@ if __name__ == '__main__':
         total_runs = 0
         try:
             while 1:
-                total_runs += test_fuzz()
+                total_runs += test_fuzz_long()
         finally:
             print(f"Runs: {total_runs}")
     else:
