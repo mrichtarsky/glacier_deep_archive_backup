@@ -208,7 +208,7 @@ class Path():
                         num_files += num_files_subdir
                     else:
                         num_files += 1
-                set_writer.write_set(paths, size, num_dirs, num_files)
+                set_writer.write_set(paths, total_size, num_dirs, num_files)
 
         return None
 
