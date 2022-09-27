@@ -46,10 +46,11 @@ class SetWriter():
 
         name = prefix.replace(self.snapshot_path, self.zfs_pool)
         name = re.sub('[^a-zA-Z0-9_-]', '_', name)
+        name = name.rstrip('_')
         return name
 
-    def write_set(self, items, size):
-        print(f"Set: {len(items)} item(s), {size_to_string(size)}")
+    def write_set(self, items, size, num_dirs, num_files):
+        print(f"Set: {len(items)} path(s), {size_to_string(size)}, {num_dirs} dir(s), {num_files} file(s)")
         archive_name = self._make_archive_name(items)
         print(f"  Archive name: {archive_name}")
 
@@ -137,21 +138,41 @@ class Path():
                 return True
         return False
 
+    def get_node(self, path):
+        if self.parent is None:
+            path = os.path.relpath(path, self.name)
+        node = self
+        if len(path) > 0 and path != '.': # relpath returns '.' for top level dir
+            comps = path.split('/')
+            for comp in comps:
+                node = node.get_dir(comp)
+        return node
+
+    def get_num_dirs_files(self):
+        num_dirs = 1 # Including current dir
+        num_files = len(self.files)
+        for dir_node in self.dirs.values():
+            num_dirs_subdir, num_files_subdir = dir_node.get_num_dirs_files()
+            num_dirs += num_dirs_subdir
+            num_files += num_files_subdir
+        return num_dirs, num_files
+
     def create_backup_sets(self, set_writer, backup_paths):
         items = []
 
         path = self.get_full_path()
         size = self.get_size()
 
+        DIR, FILE = 0, 1
         # When the path fits, we still cannot simply zip it up fully
         # since only a subset of entries may be in the backup_paths.
         if size <= self.upload_limit and self._is_inside_backup_paths(backup_paths, path):
-            items.append((path, size))
+            items.append((path, size, DIR))
         else:
             for file_, size in self.files:
                 file_path = os.path.join(path, file_)
                 if self._is_inside_backup_paths(backup_paths, file_path):
-                    items.append((file_path, size))
+                    items.append((file_path, size, FILE))
             for dir_ in self.dirs.values():
                 if dir_.get_size() > self.upload_limit:
                     dir_items = dir_.create_backup_sets(set_writer, backup_paths)
@@ -159,7 +180,7 @@ class Path():
                 else:
                     dir_path = os.path.join(path, dir_.name)
                     if self._is_inside_backup_paths(backup_paths, dir_path):
-                        items.append((dir_path, dir_.get_size()))
+                        items.append((dir_path, dir_.get_size(), DIR))
                     else:
                         dir_items = dir_.create_backup_sets(set_writer, backup_paths)
                         items.extend(dir_items)
@@ -171,9 +192,21 @@ class Path():
         if len(items) > 0:
             bins = binpacking.to_constant_volume(items, self.upload_limit, weight_pos=1)
             for bin_ in bins:
-                size = sum(item_[1] for item_ in bin_)
-                items = [ item[0] for item in bin_ ]
-                set_writer.write_set(items, size)
+                paths = []
+                total_size = 0
+                num_dirs = 0
+                num_files = 0
+                for path, size, type_ in bin_:
+                    paths.append(path)
+                    total_size += size
+                    if type_ == DIR:
+                        node = self.get_node(path)
+                        num_dirs_subdir, num_files_subdir = node.get_num_dirs_files()
+                        num_dirs += num_dirs_subdir
+                        num_files += num_files_subdir
+                    else:
+                        num_files += 1
+                set_writer.write_set(paths, size, num_dirs, num_files)
 
         return None
 
@@ -234,15 +267,6 @@ def crawl(snapshot_path, backup_paths, upload_limit):
         sub_num_files = DualCounter('subfiles', 'walk', 'find')
         sub_size_files = DualCounter('subsize', 'walk', 'find')
 
-        def get_node(path):
-            rel_path = path.replace(snapshot_path, '', 1).lstrip('/')
-            node = root_node
-            if len(rel_path) > 0:
-                comps = rel_path.split('/')
-                for comp in comps:
-                    node = node.get_dir(comp)
-            return node
-
         def process_file(node, file_path):
             info = os.lstat(file_path) # Do not follow symlinks
             sub_num_files.add_counter1(1) # pylint: disable=cell-var-from-loop
@@ -253,7 +277,7 @@ def crawl(snapshot_path, backup_paths, upload_limit):
             node.add_file(file_, file_size)
 
         if not os.path.isdir(path):
-            node = get_node(os.path.dirname(path))
+            node = root_node.get_node(os.path.dirname(path))
             process_file(node, path)
         else:
             def raise_error(error):
@@ -262,7 +286,7 @@ def crawl(snapshot_path, backup_paths, upload_limit):
             for root, _, files in os.walk(path, topdown=False,
                                           onerror=raise_error, followlinks=False):
 
-                node = get_node(root)
+                node = root_node.get_node(root)
                 for file_ in files:
                     process_file(node, os.path.join(root, file_))
 

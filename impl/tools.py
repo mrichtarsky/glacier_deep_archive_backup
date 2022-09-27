@@ -6,20 +6,37 @@ import subprocess
 class BackupException(Exception):
     pass
 
-def size_to_string(size):
+def size_to_unit(size):
     KiB = 1024
     MiB = 1024*KiB
     GiB = 1024*MiB
     TiB = 1024*GiB
+    PiB = 1024*TiB
+    if size >= PiB:
+        return PiB, 'PiB'
     if size >= TiB:
-        return f"{size / TiB:.2f}TiB"
+        return TiB, 'TiB'
     if size >= GiB:
-        return f"{size / GiB:.2f}GiB"
+        return GiB, 'GiB'
     if size >= MiB:
-        return f"{size / MiB:.2f}MiB"
+        return MiB, 'MiB'
     if size >= KiB:
-        return f"{size / KiB:.2f}KiB"
-    return f"{size} B"
+        return KiB, 'KiB'
+    return 1, 'B'
+
+def size_to_string_factor(size, factor, unit=None):
+    result = ''
+    if factor > 1:
+        result = f"{size / factor:.2f}"
+    else:
+        result = f"{size}"
+    if unit is not None:
+        result += f" {unit}"
+    return result
+
+def size_to_string(size):
+    factor, unit = size_to_unit(size)
+    return size_to_string_factor(size, factor, unit)
 
 def clean_multipart_uploads(s3_bucket):
     cmd = ('aws', 's3api', 'list-multipart-uploads', '--bucket', s3_bucket)
@@ -36,3 +53,7 @@ def clean_multipart_uploads(s3_bucket):
 def make_info_filename(list_file):
     info_file = os.path.splitext(list_file)[0] + '.info'
     return info_file
+
+if __name__ == '__main__':
+    for i in (0, 1, 1024, 1024**2, 1024**3, 1024**4, 1024**5):
+        print(i, size_to_string(i))

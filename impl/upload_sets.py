@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from impl.tools import BackupException, clean_multipart_uploads, make_info_filename, size_to_string
+from impl.tools import BackupException, clean_multipart_uploads, make_info_filename, size_to_string, size_to_string_factor, size_to_unit
 
 import json
 import os
@@ -27,7 +27,8 @@ def get_list_files(set_path):
     return list_files
 
 def build_archive(list_file, buffer_path):
-    archive_name = f"{os.path.basename(list_file)}.tar.zstd.gpg"
+    stem = os.path.splitext(os.path.basename(list_file))[0]
+    archive_name = f"{stem}.tar.zstd.gpg"
     buffer_file = os.path.join(buffer_path, archive_name)
     cmd = ('impl/build_archive.sh', list_file, buffer_file)
     print('Running', ' '.join(cmd))
@@ -72,13 +73,17 @@ def package_and_upload(set_path, buffer_path, s3_bucket, timestamp): # pylint: d
     def print_status():
         elapsed_time_sec = time.time() - start_time_sec
         active_str = seconds_to_days(elapsed_time_sec)
-        archived_str = f"{size_to_string(archived_bytes)}/{size_to_string(total_size_bytes)}"
+
+        factor, unit = size_to_unit(total_size_bytes)
+        archived_str = (f"{size_to_string_factor(archived_bytes, factor, None)}"
+                        f"/{size_to_string_factor(total_size_bytes, factor, unit)}")
         archived_perc = 100 * archived_bytes / total_size_bytes
         if archive_time_sec > 0:
             archived_per_sec_str = f"{size_to_string(archived_bytes / archive_time_sec)}"
         else:
             archived_per_sec_str = '? MiB'
-        uploaded_str = f"{size_to_string(gross_uploaded_bytes)}/{size_to_string(total_size_bytes)}"
+        uploaded_str = (f"{size_to_string_factor(gross_uploaded_bytes, factor, None)}"
+                        f"/{size_to_string_factor(total_size_bytes, factor, unit)}")
         upload_perc = 100 * gross_uploaded_bytes / total_size_bytes
         if upload_time_sec > 0:
             upload_per_sec_str = f"{size_to_string(net_uploaded_bytes / upload_time_sec)}"
@@ -136,7 +141,7 @@ def package_and_upload(set_path, buffer_path, s3_bucket, timestamp): # pylint: d
                 cmd = ['aws', 's3', 'cp', file_, bucket_path]
                 if deep_archive:
                     cmd.extend(['--storage-class', 'DEEP_ARCHIVE'])
-                print('Running', cmd)
+                print('Running', ' '.join(cmd))
                 t0 = time.time()
                 subprocess.run(cmd, check=True)
                 return time.time() - t0
