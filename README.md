@@ -158,10 +158,12 @@ Should you wish to only restore some files to save time or money you can follow 
 
 # ToDo
 
+- Wildcard
+- Store timestamp and config for resume
+- Do away with scratch/resume split and just pick off where we left off?
 - Add automated E2E test
     - Also for insufficient disk space
 - Just append to one logfile
-- Store timestamp and config for resume
-- Do away with scratch/resume split and just pick off where we left off?
 - Option for quieter output, log full output to file
 - Option to retrieve file lists only
+- Preserve permissions/untar options
