@@ -11,8 +11,10 @@ SETTINGS=$1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PYTHONPATH+=:$ROOT
+export PYTHONUNBUFFERED=1
+
 pushd "$ROOT" >/dev/null
 trap 'popd >/dev/null' EXIT
 
-stdbuf -oL -eL impl/do_backup_to_aws.sh scratch "$SETTINGS" 2>&1 | tee -i logs/backup_scratch.log
+impl/do_backup_to_aws.sh scratch "$SETTINGS" 2>&1 | tee -i logs/backup_scratch.log
 echo "OK"

@@ -12,6 +12,8 @@ TIMESTAMP=$2
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PYTHONPATH+=:$ROOT
+export PYTHONUNBUFFERED=1
+
 pushd "$ROOT" >/dev/null
 trap 'popd >/dev/null' EXIT
 
@@ -20,5 +22,5 @@ if [[ ! -f state/resumable ]]; then
     exit 1
 fi
 
-stdbuf -oL -eL impl/do_backup_to_aws.sh resume "$SETTINGS" "$TIMESTAMP" 2>&1 | tee -i logs/backup_resume.log
+impl/do_backup_to_aws.sh resume "$SETTINGS" "$TIMESTAMP" 2>&1 | tee -i logs/backup_resume.log
 echo "OK"
