@@ -24,13 +24,6 @@ SNAPSHOT=$ZFS_POOL@snapshot-aws-$TIMESTAMP
 SET_PATH=state/sets
 STATE_FILE=state/fs.state
 
-if [[ "$MODE" != resume ]]; then
-    rm -f state/resumable
-    sudo zfs snapshot "$SNAPSHOT"
-    sudo mkdir -p "$SNAPSHOT_PATH"
-    sudo mount -t zfs -o ro "$SNAPSHOT" "$SNAPSHOT_PATH"
-fi
-
 BUFFER_PATH="$BUFFER_PATH_BASE/backup_aws_buffer"
 rm -rf "$BUFFER_PATH"
 mkdir -p "$BUFFER_PATH"
@@ -43,12 +36,18 @@ function cleanup()
         echo "Error or cancel during processing. Keeping snapshot mounted at $SNAPSHOT_PATH. Please check for any errors that need to be fixed and run './backup_resume $SETTINGS $TIMESTAMP' to retry."
     else
         echo "Destroying snapshot $SNAPSHOT"
-        sudo umount "$SNAPSHOT_PATH"
+        sudo umount "$SNAPSHOT_PATH" || true
         sudo zfs destroy "$SNAPSHOT"
     fi
 }
 
-trap cleanup EXIT
+if [[ "$MODE" != resume ]]; then
+    rm -f state/resumable
+    sudo zfs snapshot "$SNAPSHOT"
+    trap cleanup EXIT
+    sudo mkdir -p "$SNAPSHOT_PATH"
+    sudo mount -t zfs -o ro "$SNAPSHOT" "$SNAPSHOT_PATH"
+fi
 
 if [[ "$MODE" != resume ]]; then
     rm -f "$SET_PATH"/*
