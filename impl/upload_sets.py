@@ -33,7 +33,7 @@ def build_archive(snapshot_path, list_file, buffer_path):
     archive_name = f"{stem}.tar.zstd.gpg"
     buffer_file = os.path.join(buffer_path, archive_name)
     cmd = ('impl/build_archive.sh', snapshot_path, list_file, buffer_file)
-    print('Running', ' '.join(cmd))
+    print(f"Running '{' '.join(cmd)}'")
     subprocess.run(cmd, check=True)
 
     return archive_name, buffer_file
@@ -146,7 +146,7 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, timestam
                 cmd = ['aws', 's3', 'cp', file_, bucket_path]
                 if deep_archive:
                     cmd.extend(['--storage-class', 'DEEP_ARCHIVE'])
-                print('Running', ' '.join(cmd))
+                print(f"Running '{' '.join(cmd)}'")
                 t0 = time.time()
                 subprocess.run(cmd, check=True)
                 return time.time() - t0
