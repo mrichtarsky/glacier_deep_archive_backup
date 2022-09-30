@@ -133,11 +133,12 @@ Should you wish to only restore some files to save time or money you can follow 
 - There is a progress display which works as follows:
 
     ```
-    Elapsed: 8m, Archived: 4.69GiB/6.43GiB (72.9%, 9.20MiB/s), Uploaded: 4.39GiB/6.43GiB (68.3%, 1.66MiB/s), ETA: 3m - 4m
+    Elapsed: 10h 38m, Archived: 0.25/2.71 TiB (9.2%, 17.49 MiB/s), Uploaded: 0.12/2.71 TiB (4.6%, 5.12 MiB/s), Ratio: 1.0x, ETA: 7d 8h 39m - 7d 20h 2m
     ```
 
     - Uploaded bytes are gross (before compression)
     - Upload speed is for net uploaded bytes (after compression)
+    - Ratio shows the achieved compression
     - For ETA, a range is estimated:
       - The lower bound assumes that the achieved compression rate remains the same for the remaining files
       - The upper bound assumes that compression is 1x for the remaining files
@@ -159,10 +160,20 @@ Should you wish to only restore some files to save time or money you can follow 
 # ToDo
 
 - Wildcard
+
 - Store timestamp and config for resume
 - Do away with scratch/resume split and just pick off where we left off?
+
 - Add automated E2E test
     - Also for insufficient disk space
+
+- Wrap tar, count lines and show progress bar
+  - Show a file every second
+  - Delete that line
+  - [1/200] /path/to/file size
+
+- Version
+
 - Just append to one logfile
 - Option for quieter output, log full output to file
 - Option to retrieve file lists only
