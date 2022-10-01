@@ -26,10 +26,9 @@ The script relies on the ZFS file system's snapshot capabilities to provide a co
 - Unix-ish system
 - ZFS pool(s)
 - Recent python
-- `tar` with `zstd` support
+- `zstd`
 - `gpg`
 - `pip install binpacking`
-- `pip install pytest` if you want to run the tests
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 - An AWS account and an S3 bucket. Follow [these instructions](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-prereqs.html) to set up an account and put the credentials in `~/.aws/credentials`. The file should look similar to this:
 
@@ -41,6 +40,8 @@ The script relies on the ZFS file system's snapshot capabilities to provide a co
     ```
 
     `region` is where your S3 bucket is located. Since this is an off-site backup, it should *not* be the region most closest to you. Best to choose a different continent ;)
+
+- `pip install pytest` if you want to run the tests
 
 ## Installation
 
@@ -171,6 +172,11 @@ Should you wish to only restore some files to save time or money you can follow 
   - Show a file every second
   - Delete that line
   - [1/200] /path/to/file size
+
+- Increase zstd compression/make configurable
+  - Compression rarely uses CPU, gpg takes up the majority. So raising it would be possible. On the other hand, when backing up videos/photos, it won't make much difference.
+
+- Parallelize archive building and upload. Currently they run in sequence. Would save about 25% of total time on my slow server (archive building is 4x faster than upload. so it could be had "for free")
 
 - Version
 
