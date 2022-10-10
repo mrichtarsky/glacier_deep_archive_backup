@@ -12,13 +12,14 @@ SNAPSHOT_PATH is where the ZFS snapshot is mounted.
 Sets are processed later by upload_sets.py.
 '''
 
-from functools import lru_cache
 from impl.tools import BackupException, make_info_filename, size_to_string
 
 import binpacking
 import copy
+from functools import lru_cache
 import json
 import os
+import pathlib
 import pickle
 import re
 import stat
@@ -302,6 +303,19 @@ def crawl(snapshot_path, backup_paths, upload_limit):
 
     return root_node
 
+def glob_backup_paths(backup_paths_unglobbed, snapshot_path):
+    backup_paths = []
+    num_warnings = 0
+    base_path = pathlib.Path(snapshot_path)
+    for path_unglobbed in backup_paths_unglobbed:
+        paths_globbed = tuple(base_path.glob(path_unglobbed))
+        if len(paths_globbed) == 0:
+            print(f"WARNING: Path {path_unglobbed} does not exist and will be ignored!")
+            num_warnings += 1
+        for path_globbed in paths_globbed:
+            backup_paths.append(os.fspath(path_globbed.relative_to(base_path)))
+    return backup_paths, num_warnings
+
 def crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file):
     root_node = crawl(snapshot_path, backup_paths, upload_limit)
     with open(state_file, 'wb') as f:
@@ -316,11 +330,19 @@ def load(state_file, set_writer, backup_paths):
 
 if __name__ == '__main__':
     zfs_pool = os.environ['ZFS_POOL']
-    backup_paths = tuple(map(os.path.normpath, sys.argv[1:]))
+    backup_paths_unglobbed = tuple(map(os.path.normpath, sys.argv[1:]))
     snapshot_path = os.path.normpath(os.environ['SNAPSHOT_PATH'])
     state_file = os.environ['STATE_FILE']
     set_path = os.path.normpath(os.environ['SET_PATH'])
     upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
+
+    backup_paths, num_warnings = glob_backup_paths(backup_paths_unglobbed, snapshot_path)
+    if num_warnings > 0 and os.environ.get('IGNORE_WARNINGS') != '1':
+        res = input(f"{num_warnings} warning(s) encountered, see above."
+                    " Proceed? (IGNORE_WARNINGS=1 skips this) [y/n] ").strip().lower()
+        if res != 'y':
+            print('ABORTED')
+            sys.exit(1)
 
     # Save state after crawling file system, so can be resumed later
     crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file)

@@ -5,11 +5,22 @@ set -euo pipefail
 # The ZFS pool with data to backup
 ZFS_POOL=tank
 
-# Files and directories to backup (recursively), relative to the ZFS pool specified above
+# Files and directories to backup (recursively), relative to the ZFS pool specified above.
+# These wildcards can be used:
+# - * for matching any number of chars, ? for matching one char.
+# - [seq] matches any character in seq, [!seq] matches any character not in seq.
+# - For a literal match, wrap the meta-characters in brackets.
+#   For example, '[?]' matches the character '?'.
+# - ** matches all directories recursively, including the current directory.
+# Matching is case sensitive.
+
 BACKUP_PATHS=(
     "file1.txt"  # Will backup /tank/file1.txt
-    "pics"
-    "sports/nba"
+    "pics"  # Top-level dir, recursively
+    "sports/nba"  # Subdir, recursively
+    "**/?"  # All files/dirs with a filename of length 1
+    "projects/**/test.py"  # All test.py files in the projects subtree
+    "*"  # All files in the pool
 )
 
 # The S3 bucket where data is stored
