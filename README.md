@@ -54,6 +54,7 @@ git clone git@github.com:mrichtarsky/glacier_deep_archive_backup.git
 ```
 wget https://github.com/mrichtarsky/glacier_deep_archive_backup/archive/refs/heads/main.zip
 unzip main.zip
+rm main.zip
 ```
 
 
@@ -61,7 +62,7 @@ unzip main.zip
 
 ## Backup
 
-- `cp config/backup_example.sh config/backup.sh` and edit `backup.sh` to reflect your setup. In `BACKUP_PATHS`, list all the files and directories that will be backed up recursively. Make sure to use double quotes to escape names that `"have spaces"` etc.
+- `cp config/backup_example.sh config/backup.sh` and edit `backup.sh` to reflect your setup. In `BACKUP_PATHS`, list all the files and directories that will be backed up recursively. Make sure to use double quotes to escape names that `"have spaces"` etc. You can use wildcards, see the notes in the file for details.
 - Edit `config/passphrase.txt` and put a strong passphrase there. Your data will be encrypted locally using this password before upload. **Make sure this file is only readable/writable by you!**
 
 - Run `./backup_scratch config/backup.sh` to start the backup. Logs are in `logs/backup_scratch.log`.
@@ -78,10 +79,14 @@ An unprivileged user can run the scripts. Make sure this user has all the necess
 Backups are saved in your S3 bucket in a timestamped directory (e.g. `2022-02-18-195831`). This directory contains pairs of files:
 
 ```
-tank_pics_000_contents.txt  # The list of dirs/files stored in the archive,
-                            # as passed to tar. Will not recursively list files of
-                            # a directory if that directory was passed to tar.
-tank_pics_000.tar.zstd.gpg  # The tar archive, zstd compressed, aes256 encrypted
+tank_pics_000.list_contents.tar.zstd.gpg
+
+# The list of dirs/files stored in the archive,
+# as passed to tar. Will not recursively list files of
+# a directory if that directory was passed to tar.
+
+tank_pics_000.tar.zstd.gpg
+# The tar archive, zstd compressed, aes256 encrypted
 ```
 
 You should store everything you need to restore the backup in a safe location:
@@ -112,7 +117,7 @@ Should you wish to only restore some files to save time or money you can follow 
 
 # Misc
 
-- Data is encryption using [`gpg`](https://www.gnupg.org/) (`AES256` cipher)
+- Data is encrypted using [`gpg`](https://www.gnupg.org/) (`AES256` cipher)
 
 - Incremental backups are not supported
 
@@ -123,13 +128,13 @@ Should you wish to only restore some files to save time or money you can follow 
     - 8 KB overhead/file billed at S3 standard storage rates
     - 32 KB overhead/file billed at Deep Archive rates
 
-    The script creates archives, so the number of files stored is very small. For an upload limit of 50 GiB, you would get 40 files/TiB. So these costs are negligible. Most other backup solutions operate 1:1 at a file level, and it's not possible to get the low Deep Archive costs that way (see alternatives below).
+    The script creates archives, so the number of files stored is very small. For an upload limit of 50 GiB, you would get 40 files/TiB. So these costs are negligible. Most other backup solutions operate 1:1 at a file level, causing tremendous costs (see alternatives below).
 
     You can check the full details on the [pricing page](https://aws.amazon.com/s3/pricing/).
 
 - Symlinks are *not* followed. Therefore, links pointing to files not covered by the paths backed up will not be considered!
 
-- No file splitting: The largest file must fit into `UPLOAD_LIMIT_MB`.
+- No file splitting: The largest file must fit into `UPLOAD_LIMIT_MB`. This is checked at the beginning.
 
 - There is a progress display which works as follows:
 
@@ -151,16 +156,15 @@ Should you wish to only restore some files to save time or money you can follow 
 
 # Alternatives
 
-- There are other backup solutions that can target Deep Glacier:
-    - [`rclone`](https://rclone.org/)
-    - [`aws sync`](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html)
+There are other backup solutions that can target Deep Glacier:
 
-   Both tools store files 1:1 in Deep Archive. Due to the cost structure this is prohibitively expensive, and the reason why this script creates archives. `aws sync` only supports server-side encryption, instead of client-side as done by this script. It cannot restore files automatically out of Deep Archive, while for `rclone` it's a manual step. This script does it automatically and also waits for the files to become available, to get the restore done as fast as possible.
-    - [Arq](https://www.arqbackup.com/) - Only supports Windows/macOS. Apart from that it looks pretty good, the amount of files created is already 40 for ~700 MiB of data, but it probably scales much better than a 1:1 copy. Also able to restore single files, and automatically requests restores and waits for them.
+- [`rclone`](https://rclone.org/)
+- [`aws sync`](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html)
+
+   Both tools store files 1:1 in Deep Archive. Due to the cost structure this is prohibitively expensive, and the reason why `glacier_deep_archive_backup` creates archives. `aws sync` only supports server-side encryption, instead of client-side as done by this script. It cannot restore files automatically out of Deep Archive, while for `rclone` it's a manual step. This script does it automatically and also waits for the files to become available, to get the restore done as fast as possible.
+- [Arq](https://www.arqbackup.com/) - Only supports Windows/macOS. Apart from that it looks pretty good, the amount of files created is already 40 for ~700 MiB of data, but it probably scales much better than a 1:1 copy. Also able to restore single files, and automatically requests restores and waits for them.
 
 # ToDo
-
-- Wildcard
 
 - Store timestamp and config for resume
 - Do away with scratch/resume split and just pick off where we left off?
