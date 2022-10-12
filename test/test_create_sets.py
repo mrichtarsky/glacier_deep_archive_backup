@@ -40,7 +40,8 @@ def create_files(items):
                 f.write('x' * size)
 
 def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylint: disable=too-many-statements
-                                upload_limit, num_expected_warnings, num_expected_sets, num_expected_files):
+                                upload_limit, num_expected_warnings,
+                                num_expected_sets, num_expected_files):
     snapshot_path = os.path.normpath(snapshot_path)
     backup_paths_unglobbed = tuple(map(os.path.normpath, backup_paths))
 
@@ -56,7 +57,8 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
     backup_paths, num_warnings = glob_backup_paths(backup_paths_unglobbed, snapshot_path)
 
     if num_expected_warnings is not None and num_expected_warnings != num_warnings:
-        raise Exception(f"Mismatch: num_expected_warnings={num_expected_warnings}, num_warnings={num_warnings}")
+        raise Exception(f"Mismatch: num_expected_warnings={num_expected_warnings}"
+                        f", num_warnings={num_warnings}")
 
     set_writer = SetWriter(snapshot_path, SET_PATH, ZFS_POOL)
     root_node = crawl(snapshot_path, backup_paths, upload_limit)
@@ -95,7 +97,8 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
                                    onerror=raise_error, followlinks=False):
             num_files += len(files)
         if num_expected_files != num_files:
-            raise Exception(f"Mismatch: num_expected_files={num_expected_files}, num_files={num_files}")
+            msg = f"Mismatch: num_expected_files={num_expected_files}, num_files={num_files}"
+            raise Exception(msg)
 
     # Condition 1: All backup paths must be identical
     extract_backup_paths = set()
@@ -137,8 +140,8 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
         raise Exception(f"Extract dir {extract_path} has extraneous items:"
                         f" files={extra_files}, dirs={extra_dirs}")
 
-def run_test(pool_files, backup_paths, upload_limit, num_expected_warnings=None, num_expected_sets=None,
-            num_expected_files=None, is_fuzz_run=False):
+def run_test(pool_files, backup_paths, upload_limit, num_expected_warnings=None,
+             num_expected_sets=None, num_expected_files=None, is_fuzz_run=False):
     for snapshot_path in SNAPSHOT_PATHS:
         try:
             run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths,

@@ -11,7 +11,9 @@ IGNORES=(
     -d too-many-locals
     -d unspecified-encoding
     -d wrong-import-order
+    -d too-many-arguments
     -d too-many-branches
+    --max-line-length=110
 )
 
 # shellcheck disable=SC2046
