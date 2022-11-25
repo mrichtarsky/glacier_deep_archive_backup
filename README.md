@@ -158,6 +158,10 @@ Should you wish to only restore some files to save time or money you can follow 
 
 There are other backup solutions that can target Deep Glacier:
 
+- [`duplicity`](https://duplicity.gitlab.io/) - This is a great tool if you want to have incremental backups. It will use rsync-style signatures to only transmit differences of files, and therefore can perform very efficient incremental backups. At the same time, it creates `tar` archives,
+  so does not sacrifice efficiency on Deep Archive. I would probably not have written the tool here had I been aware of this earlier ;) The only downside is that restore does not recover files  from Deep Archive automatically, you have to do that manually, and wait for availability, before any operations like `verify` or `restore` can work.
+  If you only care about full backups, `duplicity` does not buy you much, in fact it will cause some overhead due to the signatures stored both locally and on the backup, which are only needed for incremental backups.
+
 - [`rclone`](https://rclone.org/)
 - [`aws sync`](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html)
 
