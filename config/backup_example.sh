@@ -5,10 +5,6 @@ set -euo pipefail
 # The ZFS pool with data to backup
 ZFS_POOL=tank
 
-# A custom prefix that will be added to the name of the directory containing all
-# backup files for this set, before the timestamp
-PREFIX=data1
-
 # Files and directories to backup (recursively), relative to the ZFS pool specified above.
 # These wildcards can be used:
 # - * for matching any number of chars, ? for matching one char.
@@ -29,6 +25,11 @@ BACKUP_PATHS=(
 
 # The S3 bucket where data is stored
 S3_BUCKET=your_s3_bucket
+
+# A custom directory to store all backup files of this set in.
+# Inside this directory, for each scratch backup, a subdirectory named by timestamp is created.
+# If left empty, timestamp directories are created at top level of the bucket.
+BUCKET_DIR=mydata1
 
 # The maximum size of uploaded files. Larger sizes increase the likelihood of upload
 # failures and retries.

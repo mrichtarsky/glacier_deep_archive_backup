@@ -44,10 +44,11 @@ def get_info_for(list_file):
         info = json.load(info_file)
         return info
 
-def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, prefix, timestamp): # pylint: disable=too-many-statements
-
-    if len(prefix) and not prefix.endswith('-'):
-        prefix += '-'
+def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_dir, timestamp): # pylint: disable=too-many-statements
+    # Avoid extraneous directories on S3, normalize path
+    bucket_dir = bucket_dir.strip('/')
+    if len(bucket_dir):
+        bucket_dir += '/'
 
     num_errors = 0
     list_files = get_list_files(set_path)
@@ -152,7 +153,7 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, prefix, 
             print(f"{index}/{len(list_files)}: Uploading {archive_name}, attempt {i+1}")
 
             def do_upload(file_, archive_name, deep_archive):
-                bucket_path = f"s3://{s3_bucket}/{prefix}{timestamp}/{archive_name}"
+                bucket_path = f"s3://{s3_bucket}/{bucket_dir}{timestamp}/{archive_name}"
                 cmd = ['aws', 's3', 'cp', file_, bucket_path]
                 if deep_archive:
                     cmd.extend(['--storage-class', 'DEEP_ARCHIVE'])
@@ -192,7 +193,7 @@ if __name__ == '__main__':
     set_path = os.environ['SET_PATH']
     buffer_path = os.environ['BUFFER_PATH']
     s3_bucket = os.environ['S3_BUCKET']
-    prefix = os.environ['PREFIX']
+    bucket_dir = os.environ['BUCKET_DIR']
     timestamp = os.environ['TIMESTAMP']
 
     upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
@@ -203,7 +204,7 @@ if __name__ == '__main__':
                               f"(upload_limit={size_to_string(upload_limit)}, "
                               f"bytes_free={size_to_string(bytes_free)})")
 
-    num_errors = package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, prefix, timestamp)
+    num_errors = package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_dir, timestamp)
 
     # During upload, files will be temporarily stored in S3 standard storage.
     # Failed uploads leave orphans behind, which will cause quite high costs.
