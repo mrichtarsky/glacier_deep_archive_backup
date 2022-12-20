@@ -63,7 +63,7 @@ if [[ "$MODE" != resume ]]; then
 fi
 touch state/resumable
 
-export BUFFER_PATH S3_BUCKET TIMESTAMP
+export BUFFER_PATH S3_BUCKET PREFIX TIMESTAMP
 python impl/upload_sets.py
 rm state/resumable
 
