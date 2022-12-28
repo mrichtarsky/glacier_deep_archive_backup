@@ -29,6 +29,7 @@ S3_BUCKET=your_s3_bucket
 # A custom directory to store all backup files of this set in.
 # Inside this directory, for each scratch backup, a subdirectory named by timestamp is created.
 # If left empty, timestamp directories are created at top level of the bucket.
+# Do not specify a trailing slash.
 BUCKET_DIR=mydata1
 
 # The maximum size of uploaded files. Larger sizes increase the likelihood of upload
