@@ -50,7 +50,7 @@ def clean_multipart_uploads(s3_bucket):
                    upload['UploadId'])
             subprocess.run(cmd, check=True)
 
-def make_info_filename(list_file):
+def make_set_info_filename(list_file):
     info_file = os.path.splitext(list_file)[0] + '.info'
     return info_file
 

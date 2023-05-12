@@ -12,7 +12,7 @@ SNAPSHOT_PATH is where the ZFS snapshot is mounted.
 Sets are processed later by upload_sets.py.
 '''
 
-from impl.tools import BackupException, make_info_filename, size_to_string
+from impl.tools import BackupException, make_set_info_filename, size_to_string
 
 import binpacking
 import copy
@@ -70,7 +70,7 @@ class SetWriter():
                 print('  ', item)
                 print(item, file=list_file)
 
-        info_filename = make_info_filename(list_filename)
+        info_filename = make_set_info_filename(list_filename)
         with open(info_filename, 'wt') as info_file:
             info = { 'size_bytes': size }
             json.dump(info, info_file)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from impl.tools import (BackupException, clean_multipart_uploads,
-                        make_info_filename, size_to_string,
+                        make_set_info_filename, size_to_string,
                         size_to_string_factor, size_to_unit)
 
 import json
@@ -38,8 +38,8 @@ def build_archive(snapshot_path, list_file, buffer_path):
 
     return archive_name, buffer_file
 
-def get_info_for(list_file):
-    info_file = make_info_filename(list_file)
+def get_set_info_for(list_file):
+    info_file = make_set_info_filename(list_file)
     with open(info_file, 'rt') as info_file:
         info = json.load(info_file)
         return info
@@ -55,7 +55,7 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
 
     total_size_bytes = 0
     for list_file in list_files:
-        info = get_info_for(list_file)
+        info = get_set_info_for(list_file)
         total_size_bytes += info['size_bytes']
 
     archived_bytes = 0 # uncompressed
@@ -180,7 +180,7 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
         os.unlink(archive_file)
         if upload_success:
             os.unlink(list_file)
-            os.unlink(make_info_filename(list_file))
+            os.unlink(make_set_info_filename(list_file))
             os.unlink(list_list_filepath)
             os.unlink(contents_archive_file)
         else:
