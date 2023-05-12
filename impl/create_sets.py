@@ -50,8 +50,8 @@ class SetWriter():
         name = name.rstrip('_')
         return name
 
-    def write_set(self, items, size, num_dirs, num_files):
-        print(f"Set: {len(items)} path(s), {size_to_string(size)}"
+    def write_set(self, set_index, num_sets, items, size, num_dirs, num_files):
+        print(f"Set {set_index+1}/{num_sets}: {len(items)} path(s), {size_to_string(size)}"
               f", {num_dirs} dir(s), {num_files} file(s)")
         archive_name = self._make_archive_name(items)
         print(f"  Archive name: {archive_name}")
@@ -194,7 +194,7 @@ class Path():
 
         if len(items) > 0:
             bins = binpacking.to_constant_volume(items, self.upload_limit, weight_pos=1)
-            for bin_ in bins:
+            for bin_index, bin_ in enumerate(bins):
                 paths = []
                 total_size = 0
                 num_dirs = 0
@@ -209,7 +209,7 @@ class Path():
                         num_files += num_files_subdir
                     else:
                         num_files += 1
-                set_writer.write_set(paths, total_size, num_dirs, num_files)
+                set_writer.write_set(bin_index, len(bins), paths, total_size, num_dirs, num_files)
 
         return None
 
