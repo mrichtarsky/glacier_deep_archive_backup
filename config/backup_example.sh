@@ -39,6 +39,6 @@ UPLOAD_LIMIT_MB=50000
 # A path where the ZFS snapshot will be mounted during backup
 SNAPSHOT_PATH=/snapshot_aws_backup
 
-# Dir with at least UPLOAD_LIMIT_MB free space. A subdirectory 'backup_aws_buffer'
+# Dir with at least 2 * UPLOAD_LIMIT_MB free space. A subdirectory 'backup_aws_buffer'
 # will be DELETED and recreated there!
 BUFFER_PATH_BASE='/tmp'

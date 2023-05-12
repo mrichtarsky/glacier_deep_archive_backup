@@ -6,9 +6,11 @@ from impl.tools import (BackupException, clean_multipart_uploads,
 
 import json
 import os
+import queue
 import shutil
 import subprocess
 import sys
+import threading
 import time
 
 
@@ -43,6 +45,47 @@ def get_set_info_for(list_file):
     with open(info_file, 'rt') as info_file:
         info = json.load(info_file)
         return info
+
+def archiver(archive_queue, snapshot_path, list_files, buffer_path):
+    archive_file = None
+    list_list_filepath = None
+    contents_archive_file = None
+    try:
+        for index, list_file in enumerate(list_files, 1):
+            print(f"{index}/{len(list_files)}: Packing set {list_file}")
+
+            t0 = time.time()
+            archive_name, archive_file = build_archive(snapshot_path, list_file, buffer_path)
+            archive_time_sec = time.time() - t0
+            archive_size_bytes = os.path.getsize(archive_file)
+
+            info = get_set_info_for(list_file)
+            archived_bytes = info['size_bytes']
+
+            stem = os.path.basename(list_file)
+            list_list_filename = f"{stem}_contents.txt"
+            list_list_filepath = os.path.join(buffer_path, list_list_filename)
+            with open(list_list_filepath, 'wt') as f:
+                print(list_file, file=f)
+            contents_archive_name, contents_archive_file = build_archive('.',
+                                                                        list_list_filepath,
+                                                                        buffer_path)
+
+            archive_queue.put((list_file, archive_name, archive_file, archive_time_sec, archive_size_bytes,
+                               archived_bytes, list_list_filepath, contents_archive_name,
+                               contents_archive_file))
+            archive_file = None
+            list_list_filepath = None
+            contents_archive_file = None
+    except:  # pylint: disable=bare-except
+        if archive_file is not None:
+            os.unlink(archive_file)
+        if list_list_filepath is not None:
+            os.unlink(list_list_filepath)
+        if contents_archive_file is not None:
+            os.unlink(contents_archive_file)
+
+    archive_queue.put(None)  # Done signal
 
 def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_dir, timestamp): # pylint: disable=too-many-statements
     # Avoid extraneous directories on S3, normalize path
@@ -127,65 +170,84 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
 
         print(msg)
 
-    for index, list_file in enumerate(list_files, 1):
-        print(f"{index}/{len(list_files)}: Packing set {list_file}")
+    # Upload will usually be slower than archive building. So build the archives in the
+    # background, so that we will always have an archive ready for upload.
+    # At most two archives will exist in parallel (one of it in process of being uploaded).
+    archive_queue = queue.Queue(maxsize=1)
+    archive_thread = threading.Thread(target=archiver,
+                                      args=(archive_queue, snapshot_path, list_files, buffer_path))
 
-        t0 = time.time()
-        archive_name, archive_file = build_archive(snapshot_path, list_file, buffer_path)
-        archive_time_sec += time.time() - t0
-        archive_size_bytes += os.path.getsize(archive_file)
+    archive_thread.daemon = True
+    archive_thread.start()
 
-        info = get_info_for(list_file)
-        archived_bytes += info['size_bytes']
-        print_status()
+    archive_index = 0
 
-        stem = os.path.basename(list_file)
-        list_list_filename = f"{stem}_contents.txt"
-        list_list_filepath = os.path.join(buffer_path, list_list_filename)
-        with open(list_list_filepath, 'wt') as f:
-            print(list_file, file=f)
-        contents_archive_name, contents_archive_file = build_archive('.',
-                                                                     list_list_filepath,
-                                                                     buffer_path)
-
+    while True:
+        result = archive_queue.get()
+        if result is None:
+            archive_thread.join()
+            break
+        archive_index += 1
+        (list_file, archive_name, archive_file, archive_time_sec_job, archive_size_bytes_job,
+         archived_bytes_job, list_list_filepath, contents_archive_name, contents_archive_file) = result
         upload_success = False
-        for i in range(3):
-            print(f"{index}/{len(list_files)}: Uploading {archive_name}, attempt {i+1}")
 
-            def do_upload(file_, archive_name, deep_archive):
-                bucket_path = f"s3://{s3_bucket}/{bucket_dir}{timestamp}/{archive_name}"
-                cmd = ['aws', 's3', 'cp', file_, bucket_path]
-                if deep_archive:
-                    cmd.extend(['--storage-class', 'DEEP_ARCHIVE'])
-                print(f"Running '{' '.join(cmd)}'")
-                t0 = time.time()
-                subprocess.run(cmd, check=True)
-                return time.time() - t0
+        try:
+            archive_time_sec += archive_time_sec_job
+            archive_size_bytes += archive_size_bytes_job
+            archived_bytes += archived_bytes_job
+            print_status()
 
-            try:
-                do_upload(contents_archive_file, contents_archive_name, deep_archive=False)
-                file_upload_time_sec = do_upload(archive_file, archive_name, deep_archive=True)
+            for i in range(3):
+                print(f"{archive_index}/{len(list_files)}: Uploading {archive_name}, attempt {i+1}")
 
-                upload_success = True
-                net_uploaded_bytes += os.path.getsize(archive_file)
-                gross_uploaded_bytes += info['size_bytes']
-                upload_time_sec += file_upload_time_sec
-                break
-            except subprocess.CalledProcessError as e:
-                print('Error during upload: ', e)
-            finally:
-                print_status()
+                def do_upload(file_, archive_name, deep_archive):
+                    bucket_path = f"s3://{s3_bucket}/{bucket_dir}{timestamp}/{archive_name}"
+                    cmd = ['aws', 's3', 'cp', file_, bucket_path]
+                    if deep_archive:
+                        cmd.extend(['--storage-class', 'DEEP_ARCHIVE'])
+                    print(f"Running '{' '.join(cmd)}'")
+                    t0 = time.time()
+                    subprocess.run(cmd, check=True)
+                    return time.time() - t0
 
-        # Delete archive in any case, retry will recreate it and we need the space
-        os.unlink(archive_file)
-        if upload_success:
-            os.unlink(list_file)
-            os.unlink(make_set_info_filename(list_file))
-            os.unlink(list_list_filepath)
-            os.unlink(contents_archive_file)
-        else:
-            # When upload failed, backup_resume will have to be run.
-            num_errors += 1
+                try:
+                    do_upload(contents_archive_file, contents_archive_name, deep_archive=False)
+                    file_upload_time_sec = do_upload(archive_file, archive_name, deep_archive=True)
+
+                    upload_success = True
+                    net_uploaded_bytes += os.path.getsize(archive_file)
+                    gross_uploaded_bytes += archived_bytes_job
+                    upload_time_sec += file_upload_time_sec
+                    break
+                except subprocess.CalledProcessError as e:
+                    print('Error during upload: ', e)
+                finally:
+                    print_status()
+        finally:
+            # Delete archive in any case, retry will recreate it and we need the space
+            os.unlink(archive_file)
+            if upload_success:
+                os.unlink(list_file)
+                os.unlink(make_set_info_filename(list_file))
+
+            exception_pending = sys.exc_info()[0] is not None  # We will return, clean up
+            if upload_success or exception_pending:
+                os.unlink(list_list_filepath)
+                os.unlink(contents_archive_file)
+
+            if exception_pending:
+                # Clean up files in queue
+                result = archive_queue.get(block=False)
+                if result is not None:
+                    (_, _, archive_file, _, _, _, list_list_filepath, _, contents_archive_file) = result
+                    os.unlink(archive_file)
+                    os.unlink(list_list_filepath)
+                    os.unlink(contents_archive_file)
+
+            if not upload_success:
+                # When upload failed, backup_resume will have to be run.
+                num_errors += 1
 
     return num_errors
 

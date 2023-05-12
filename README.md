@@ -150,7 +150,9 @@ Should you wish to only restore some files to save time or money you can follow 
       - The upper bound assumes that compression is 1x for the remaining files
       - It's possible that the lower bound is still too high when the remaining files compress better
 
-- Backup files are not deleted in your S3 bucket, you need to take care of this yourself
+- Backup files are not deleted in your S3 bucket, you need to take care of this yourself. There is an [`expire`](https://github.com/mrichtarsky/glacier_deep_archive_backup/blob/main/expire) script you can use for that.
+
+- Since typically archive building is faster than upload, archive building will create the next archive in the background, so that the upload can run continuously after the ramp up. This leads to about 25% reduction of elapsed time on my server/connection.
 
 - Discussed on [Hacker News](https://news.ycombinator.com/item?id=32864052)
 
@@ -183,8 +185,6 @@ There are other backup solutions that can target Deep Glacier:
 
 - Increase zstd compression/make configurable
   - Compression rarely uses CPU, gpg takes up the majority. So raising it would be possible. On the other hand, when backing up videos/photos, it won't make much difference.
-
-- Parallelize archive building and upload. Currently they run in sequence. Would save about 25% of total time on my slow server (archive building is 4x faster than upload. so it could be had "for free")
 
 - Version
 
