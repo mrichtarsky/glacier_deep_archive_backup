@@ -184,6 +184,7 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
             os.unlink(list_list_filepath)
             os.unlink(contents_archive_file)
         else:
+            # When upload failed, backup_resume will have to be run.
             num_errors += 1
 
     return num_errors
