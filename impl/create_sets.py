@@ -54,7 +54,6 @@ class SetWriter():
         print(f"Set {set_index+1}/{num_sets}: {len(items)} path(s), {size_to_string(size)}"
               f", {num_dirs} dir(s), {num_files} file(s)")
         archive_name = self._make_archive_name(items)
-        print(f"  Archive name: {archive_name}")
 
         counter = 0
         while True:
@@ -63,6 +62,8 @@ class SetWriter():
             if not os.path.exists(list_filename):
                 break
             counter += 1
+
+        print(f"  Archive name: {archive_name}_{counter:03d}")
 
         with open(list_filename, 'wt') as list_file:
             for item in items:

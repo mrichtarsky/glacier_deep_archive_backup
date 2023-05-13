@@ -52,7 +52,10 @@ def archiver(archive_queue, snapshot_path, list_files, buffer_path):
     contents_archive_file = None
     try:
         for index, list_file in enumerate(list_files, 1):
-            print(f"{index}/{len(list_files)}: Packing set {list_file}")
+            while archive_queue.full():
+                time.sleep(5)
+
+            print(f"Set {index}/{len(list_files)}: Packing from list '{list_file}'")
 
             t0 = time.time()
             archive_name, archive_file = build_archive(snapshot_path, list_file, buffer_path)
@@ -199,7 +202,7 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
             print_status()
 
             for i in range(3):
-                print(f"{archive_index}/{len(list_files)}: Uploading {archive_name}, attempt {i+1}")
+                print(f"Set {archive_index}/{len(list_files)}: Uploading {archive_name}, attempt {i+1}")
 
                 def do_upload(file_, archive_name, deep_archive):
                     bucket_path = f"s3://{s3_bucket}/{bucket_dir}{timestamp}/{archive_name}"
