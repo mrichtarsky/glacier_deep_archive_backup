@@ -80,6 +80,8 @@ def archiver(archive_queue, snapshot_path, list_files, buffer_path):
             archive_file = None
             list_list_filepath = None
             contents_archive_file = None
+
+        archive_queue.put(True)  # All processed, sucess
     except:  # pylint: disable=bare-except
         if archive_file is not None:
             os.unlink(archive_file)
@@ -87,8 +89,7 @@ def archiver(archive_queue, snapshot_path, list_files, buffer_path):
             os.unlink(list_list_filepath)
         if contents_archive_file is not None:
             os.unlink(contents_archive_file)
-
-    archive_queue.put(None)  # Done signal
+        archive_queue.put(False)  # Failure
 
 def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_dir, timestamp): # pylint: disable=too-many-statements
     # Avoid extraneous directories on S3, normalize path
@@ -187,8 +188,10 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
 
     while True:
         result = archive_queue.get()
-        if result is None:
+        if result in (True, False):
             archive_thread.join()
+            if result is False:
+                num_errors += 1
             break
         archive_index += 1
         (list_file, archive_name, archive_file, archive_time_sec_job, archive_size_bytes_job,
@@ -240,9 +243,10 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
                 os.unlink(contents_archive_file)
 
             if exception_pending:
-                # Clean up files in queue
+                # Clean up files in queue. This is not totally clean, since the archiver thread
+                # is still running and producing, so there can be leftovers.
                 result = archive_queue.get(block=False)
-                if result is not None:
+                if result not in (True, False):
                     (_, _, archive_file, _, _, _, list_list_filepath, _, contents_archive_file) = result
                     os.unlink(archive_file)
                     os.unlink(list_list_filepath)

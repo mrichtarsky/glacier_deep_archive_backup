@@ -174,6 +174,7 @@ There are other backup solutions that can target Deep Glacier:
 
 - Store timestamp and config for resume
 - Do away with scratch/resume split and just pick off where we left off?
+- Add test for case where archiver thread runs into error
 
 - Add automated E2E test
     - Also for insufficient disk space
