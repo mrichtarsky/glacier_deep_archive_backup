@@ -233,7 +233,7 @@ class DualCounter:
             msg = (f"Mismatch: {self.title}: {self.name1}={self.count1}, "
                    f"{self.name2}={self.count2}, "
                    f"diff: {self.count1 - self.count2}")
-            raise Exception(msg)
+            raise BackupException(msg)
 
     def __add__(self, rhs):
         result = copy.deepcopy(self)

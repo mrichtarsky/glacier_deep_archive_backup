@@ -5,6 +5,8 @@ import subprocess
 from threading import Thread
 import time
 
+from impl.tools import BackupException
+
 # Number of days the object stays available for download after restore.
 # If there is lots of data to download, the default may have to be increased.
 RESTORATION_PERIOD_DAYS = 3
@@ -70,7 +72,7 @@ def download_and_extract(s3_bucket, num_total_files, buffer_path, extract_path):
             except subprocess.CalledProcessError as e:
                 print('Error during download: ', e)
         if not download_success:
-            raise Exception('Download failed, see above. Exiting.')
+            raise BackupException('Download failed, see above. Exiting.')
         archive_name = os.path.basename(archive_path)
         cmd = ('./extract_archive', os.path.join(buffer_path, archive_name), extract_path)
         subprocess.run(cmd, check=True)

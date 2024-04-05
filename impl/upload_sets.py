@@ -150,11 +150,11 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
             ratio_str = '?'
         if (archived_bytes > 0 and archive_time_sec > 0 and upload_time_sec > 0 and
                 gross_uploaded_bytes > 0 and net_uploaded_bytes > 0):
-            archived_bytes_per_sec = (archived_bytes / archive_time_sec)
+            archived_bytes_per_sec = archived_bytes / archive_time_sec
             eta_archiving_sec = (total_size_bytes - archived_bytes) / archived_bytes_per_sec
             gross_remaining_upload_bytes = total_size_bytes - gross_uploaded_bytes
             # Pessimistic: Remaining compression is 1x
-            net_uploaded_bytes_per_sec = (net_uploaded_bytes / upload_time_sec)
+            net_uploaded_bytes_per_sec = net_uploaded_bytes / upload_time_sec
             max_eta_upload_sec = gross_remaining_upload_bytes / net_uploaded_bytes_per_sec
             # Optimistic: Compression ratio is constant as for data before
             min_eta_upload_sec = max_eta_upload_sec * (net_uploaded_bytes / gross_uploaded_bytes)

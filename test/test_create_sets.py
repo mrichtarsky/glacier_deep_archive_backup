@@ -29,6 +29,9 @@ SET_PATH = os.path.join(WORK_PATH, 'sets')
 REPRO_PATH = os.path.join(SCRIPT_PATH, 'state', 'repro.pickle.')
 os.makedirs(os.path.dirname(REPRO_PATH), exist_ok=True)
 
+class TestException(Exception):
+    pass
+
 def create_files(items):
     for item_path, size in items:
         if item_path.endswith('/'):
@@ -57,7 +60,7 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
     backup_paths, num_warnings = glob_backup_paths(backup_paths_unglobbed, snapshot_path)
 
     if num_expected_warnings is not None and num_expected_warnings != num_warnings:
-        raise Exception(f"Mismatch: num_expected_warnings={num_expected_warnings}"
+        raise TestException(f"Mismatch: num_expected_warnings={num_expected_warnings}"
                         f", num_warnings={num_warnings}")
 
     set_writer = SetWriter(snapshot_path, SET_PATH, ZFS_POOL)
@@ -69,10 +72,10 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
         if len(backup_paths) == 0:
             # Nothing else to verify, backup set is empty
             return
-        raise Exception('backup_paths not empty, but no set files found')
+        raise TestException('backup_paths not empty, but no set files found')
 
     if num_expected_sets is not None and len(list_files) != num_expected_sets:
-        raise Exception(f"Wrong number of sets={len(list_files)}, expected={num_expected_sets}")
+        raise TestException(f"Wrong number of sets={len(list_files)}, expected={num_expected_sets}")
 
     archive_paths = []
     for list_file in list_files:
@@ -98,7 +101,7 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
             num_files += len(files)
         if num_expected_files != num_files:
             msg = f"Mismatch: num_expected_files={num_expected_files}, num_files={num_files}"
-            raise Exception(msg)
+            raise TestException(msg)
 
     # Condition 1: All backup paths must be identical
     extract_backup_paths = set()
@@ -137,7 +140,7 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
                 extra_dirs.append(rel_path)
 
     if len(extra_files) > 0 or len(extra_dirs) > 0:
-        raise Exception(f"Extract dir {extract_path} has extraneous items:"
+        raise TestException(f"Extract dir {extract_path} has extraneous items:"
                         f" files={extra_files}, dirs={extra_dirs}")
 
 def run_test(pool_files, backup_paths, upload_limit, num_expected_warnings=None,
@@ -243,7 +246,7 @@ def test_file_size_exceeds_upload_limit_throws():
 
     try:
         run_test(pool_files, ('1',), SIZE_SMALL - 1)
-        raise Exception('Expected exception, got none')
+        raise TestException('Expected exception, got none')
     except BackupException:
         pass
 
