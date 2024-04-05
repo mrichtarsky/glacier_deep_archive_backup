@@ -11,6 +11,7 @@
         - $0.0025/GiB ($2.56/TiB) for Bulk within 48 hours
         - $0.02/GiB ($20.48/TiB) for Standard within 12 hours
     - Download: The first 100 GiB/month are free, then 10 TiB/Month for $0.09 per GiB ($92.16/TiB) and discounts for more.
+    - **Update:** With the [European Data Act coming into force](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=OJ:L_202302854&qid=1709707090487#d1e3746-1-1), the cost structure likely changes significantly: Egress fees are no longer permitted, and [AWS has admitted as much](https://aws.amazon.com/blogs/aws/free-data-transfer-out-to-internet-when-moving-out-of-aws/), although they are tying this to "moving out of AWS" (without checking). So while you shouldn't rely on it, it's probably safe to assume that you won't need to pay the download fees above, which are 90% of the recovery costs, so for bulk you only pay $2.56/TiB.
 
 - The assumption is that you will hopefully never need to restore ;) (and for testing, you can use the 100 GiB free download where you only pay for restore)
 - Note: The minimum storage charge is for 180 days. So even if you delete your data earlier, you still pay. So this backup solution is not meant for fast-changing data, but it allows you to retain quite a few full backups that you can restore directly without applying several incremental backups on top.
