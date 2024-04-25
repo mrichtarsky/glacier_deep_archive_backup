@@ -65,11 +65,16 @@ class SetWriter():
 
         print(f"  Archive name: {archive_name}_{counter:03d}")
 
+        num_files_printed = 0
         with open(list_filename, 'wt') as list_file:
             for item in items:
                 item = os.path.relpath(item, self.snapshot_path)
-                print('  ', item)
+                if num_files_printed < 10:
+                    print('  ', item)
+                    num_files_printed += 1
                 print(item, file=list_file)
+        if len(items) > num_files_printed:
+            print(f"  ... ({len(items)-num_files_printed} more)")
 
         info_filename = make_set_info_filename(list_filename)
         with open(info_filename, 'wt') as info_file:
