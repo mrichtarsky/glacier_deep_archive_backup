@@ -233,6 +233,10 @@ class DualCounter:
     def add_counter2(self, count_):
         self.count2 += count_
 
+    def get(self):
+        self.verify()
+        return self.count1
+
     def verify(self):
         if self.count1 != self.count2:
             msg = (f"Mismatch: {self.title}: {self.name1}={self.count1}, "
@@ -303,6 +307,8 @@ def crawl(snapshot_path, backup_paths, upload_limit):
 
         num_files += sub_num_files
         size_files += sub_size_files
+
+        print(f"  {size_to_string(sub_size_files.get())}, {sub_num_files.get()} files")
 
     num_files.verify()
     size_files.verify()
