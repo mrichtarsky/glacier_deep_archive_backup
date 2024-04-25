@@ -227,7 +227,7 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
                     upload_time_sec += file_upload_time_sec
                     break
                 except subprocess.CalledProcessError as e:
-                    print('Error during upload: ', e)
+                    print(f"Error during upload: {e}")
                 finally:
                     print_status()
         finally:

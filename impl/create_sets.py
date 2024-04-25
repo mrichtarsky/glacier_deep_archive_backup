@@ -70,7 +70,7 @@ class SetWriter():
             for item in items:
                 item = os.path.relpath(item, self.snapshot_path)
                 if num_files_printed < 10:
-                    print('  ', item)
+                    print(f"  {item}")
                     num_files_printed += 1
                 print(item, file=list_file)
         if len(items) > num_files_printed:
@@ -275,7 +275,7 @@ def crawl(snapshot_path, backup_paths, upload_limit):
 
     for path in backup_paths:
         path = os.path.join(snapshot_path, path)
-        print('Crawling', path)
+        print(f"Crawling {path}")
 
         sub_num_files = DualCounter('subfiles', 'walk', 'find')
         sub_size_files = DualCounter('subsize', 'walk', 'find')
@@ -336,7 +336,7 @@ def crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file):
 def load(state_file, set_writer, backup_paths):
     with open(state_file, 'rb') as f:
         root_node = pickle.load(f)
-    print('Total size of backed up files:', size_to_string(root_node.get_size()))
+    print(f"Total size of backed up files: {size_to_string(root_node.get_size())}")
     root_node.create_backup_sets(set_writer, backup_paths)
 
 

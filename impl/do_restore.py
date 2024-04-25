@@ -70,7 +70,7 @@ def download_and_extract(s3_bucket, num_total_files, buffer_path, extract_path):
                 download_success = True
                 break
             except subprocess.CalledProcessError as e:
-                print('Error during download: ', e)
+                print(f"Error during download: {e}")
         if not download_success:
             raise BackupException('Download failed, see above. Exiting.')
         archive_name = os.path.basename(archive_path)
@@ -114,7 +114,7 @@ while 1:
     if num_restores != prev_num_restores or num_downloads != prev_num_downloads:
         print(f"Remaining jobs: restores={num_restores}, downloads={num_downloads}")
         if not download_in_progress and num_restores > 0:
-            print("(No further output while restores are pending, please be patient)")
+            print('(No further output while restores are pending, please be patient)')
         prev_num_restores = num_restores
         prev_num_downloads = num_downloads
     if num_restores + num_downloads == 0:

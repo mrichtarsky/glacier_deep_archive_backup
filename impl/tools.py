@@ -44,7 +44,7 @@ def clean_multipart_uploads(s3_bucket):
     if len(parts_json) > 0:
         parts = json.loads(parts_json)
         for upload in parts['Uploads']:
-            print('Cleaning remaining multipart', upload['Key'])
+            print(f"Cleaning remaining multipart {upload['Key']}")
             cmd = ('aws', 's3api', 'abort-multipart-upload', '--bucket',
                    s3_bucket, '--key', upload['Key'], '--upload-id',
                    upload['UploadId'])
@@ -56,4 +56,4 @@ def make_set_info_filename(list_file):
 
 if __name__ == '__main__':
     for i in (0, 1, 1024, 1024**2, 1024**3, 1024**4, 1024**5):
-        print(i, size_to_string(i))
+        print(f"{i}: {size_to_string(i)}")
