@@ -91,6 +91,10 @@ files_to_restore = []
 download_queue = Queue()
 
 files = get_files(s3_bucket, timestamp)
+if files is None:
+    raise BackupException('No files found in bucket. Please check whether the path specified'
+                          ' as TIMESTAMP in your restore config exists in your bucket'
+                          ' (it may contain slashes as well for subdirectories).')
 for file_ in files:
     request_restore(s3_bucket, file_[0], RESTORATION_PERIOD_DAYS, restore_tier, files_to_restore)
 num_total_files = len(files_to_restore)
