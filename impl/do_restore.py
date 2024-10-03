@@ -11,8 +11,9 @@ from impl.tools import BackupException
 # If there is lots of data to download, the default may have to be increased.
 RESTORATION_PERIOD_DAYS = 3
 
-def get_files(s3_bucket, timestamp):
-    cmd = ('aws', 's3api', 'list-objects-v2', '--bucket', s3_bucket, '--prefix', timestamp,
+def get_files(s3_bucket, bucket_dir, timestamp):
+    prefix = f'{bucket_dir.strip("/")}/{timestamp.strip("/")}'
+    cmd = ('aws', 's3api', 'list-objects-v2', '--bucket', s3_bucket, '--prefix', prefix,
            '--query', "Contents[?StorageClass=='DEEP_ARCHIVE'].[Key, Size]",
            '--no-paginate', '--output', 'json')
     cp = subprocess.run(cmd, capture_output=True, check=True)
@@ -80,6 +81,7 @@ def download_and_extract(s3_bucket, num_total_files, buffer_path, extract_path):
         num_processed_files += 1
 
 s3_bucket = os.environ['S3_BUCKET']
+bucket_dir = os.environ['BUCKET_DIR']
 timestamp = os.environ['TIMESTAMP']
 restore_tier = os.environ['RESTORE_TIER']
 buffer_path = os.environ['BUFFER_PATH']
@@ -90,7 +92,7 @@ os.makedirs(extract_path, exist_ok=True)
 files_to_restore = []
 download_queue = Queue()
 
-files = get_files(s3_bucket, timestamp)
+files = get_files(s3_bucket, bucket_dir, timestamp)
 if files is None:
     raise BackupException('No files found in bucket. Please check whether the path specified'
                           ' as TIMESTAMP in your restore config exists in your bucket'

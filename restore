@@ -26,6 +26,6 @@ BUFFER_PATH="$BUFFER_PATH_BASE/restore_aws_buffer"
 rm -rf "$BUFFER_PATH"
 mkdir -p "$BUFFER_PATH"
 
-export BUFFER_PATH EXTRACT_PATH RESTORE_TIER S3_BUCKET TIMESTAMP
+export BUCKET_DIR BUFFER_PATH EXTRACT_PATH RESTORE_TIER S3_BUCKET TIMESTAMP
 
 PYTHONUNBUFFERED=1 stdbuf -oL -eL python impl/do_restore.py 2>&1 | tee -i logs/restore.log

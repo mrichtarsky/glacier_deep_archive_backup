@@ -5,6 +5,9 @@ set -euo pipefail
 # The S3 bucket where data is stored
 S3_BUCKET=your_s3_bucket
 
+# The subdirectory that was used for backup (see your backup config)
+BUCKET_DIR=mydata1
+
 # The timestamp of the backup to restore (see your bucket for which are available)
 TIMESTAMP=2022-09-14-082857
 
