@@ -59,12 +59,12 @@ fi
 export SET_PATH SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB ZFS_POOL
 
 if [[ "$MODE" != resume ]]; then
-    python impl/create_sets.py "${BACKUP_PATHS[@]}"
+    impl/create_sets.py "${BACKUP_PATHS[@]}"
 fi
 touch state/resumable
 
 export BUCKET_DIR BUFFER_PATH S3_BUCKET TIMESTAMP
-python impl/upload_sets.py
+impl/upload_sets.py
 rm state/resumable
 
 echo "Completed backup (config=$SETTINGS, timestamp=$TIMESTAMP)"

@@ -1,15 +1,16 @@
 import json
 import os
-from queue import Queue
 import subprocess
-from threading import Thread
 import time
+from queue import Queue
+from threading import Thread
 
 from impl.tools import BackupException
 
 # Number of days the object stays available for download after restore.
 # If there is lots of data to download, the default may have to be increased.
 RESTORATION_PERIOD_DAYS = 3
+
 
 def get_files(s3_bucket, bucket_dir, timestamp):
     prefix = f'{bucket_dir.strip("/")}/{timestamp.strip("/")}'
@@ -21,6 +22,7 @@ def get_files(s3_bucket, bucket_dir, timestamp):
     file_list = json.loads(cp.stdout.decode())
 
     return file_list
+
 
 def request_restore(s3_bucket, file_, days, restore_tier, files_to_restore):
     restore_request = """{ "Days": %d, "GlacierJobParameters": { "Tier": "%s" } }""" \
@@ -34,6 +36,7 @@ def request_restore(s3_bucket, file_, days, restore_tier, files_to_restore):
         if not 'RestoreAlreadyInProgress' in e.stderr.decode():
             raise
     files_to_restore.append(file_)
+
 
 # Thread 1
 def wait_for_restore(s3_bucket, files_to_restore):
@@ -51,34 +54,38 @@ def wait_for_restore(s3_bucket, files_to_restore):
             files_to_restore.remove(restored_file)
             download_queue.put(restored_file)
 
+
 download_in_progress = False
+
 
 # Thread 2
 def download_and_extract(s3_bucket, num_total_files, buffer_path, extract_path):
-    global download_in_progress # pylint: disable=global-statement
+    global download_in_progress  # pylint: disable=global-statement
     num_processed_files = 0
     while not download_queue.empty() or len(files_to_restore) > 0:
         archive_path = download_queue.get()
         download_in_progress = True
-        bucket_path = f"s3://{s3_bucket}/{archive_path}"
+        bucket_path = f's3://{s3_bucket}/{archive_path}'
         cmd = ('aws', 's3', 'cp', bucket_path, buffer_path)
         download_success = False
         for i in range(3):
-            print (f"{num_processed_files+1}/{num_total_files}:"
-                   f" Downloading {archive_path}, attempt {i+1}")
+            print(f'{num_processed_files+1}/{num_total_files}:'
+                  f' Downloading {archive_path}, attempt {i+1}')
             try:
                 subprocess.run(cmd, check=True)
                 download_success = True
                 break
             except subprocess.CalledProcessError as e:
-                print(f"Error during download: {e}")
+                print(f'Error during download: {e}')
         if not download_success:
             raise BackupException('Download failed, see above. Exiting.')
         archive_name = os.path.basename(archive_path)
-        cmd = ('./extract_archive', os.path.join(buffer_path, archive_name), extract_path)
+        archive_local_path = os.path.join(buffer_path, archive_name)
+        cmd = ('./extract_archive', archive_local_path, extract_path)
         subprocess.run(cmd, check=True)
         download_in_progress = False
         num_processed_files += 1
+
 
 s3_bucket = os.environ['S3_BUCKET']
 bucket_dir = os.environ['BUCKET_DIR']
@@ -98,7 +105,8 @@ if files is None:
                           ' as TIMESTAMP in your restore config exists in your bucket'
                           ' (it may contain slashes as well for subdirectories).')
 for file_ in files:
-    request_restore(s3_bucket, file_[0], RESTORATION_PERIOD_DAYS, restore_tier, files_to_restore)
+    request_restore(s3_bucket, file_[0], RESTORATION_PERIOD_DAYS, restore_tier,
+                    files_to_restore)
 num_total_files = len(files_to_restore)
 
 wait_for_restore_thread = Thread(target=wait_for_restore,
@@ -118,7 +126,7 @@ while 1:
     num_restores = len(files_to_restore)
     num_downloads = download_queue.qsize()
     if num_restores != prev_num_restores or num_downloads != prev_num_downloads:
-        print(f"Remaining jobs: restores={num_restores}, downloads={num_downloads}")
+        print(f'Remaining jobs: restores={num_restores}, downloads={num_downloads}')
         if not download_in_progress and num_restores > 0:
             print('(No further output while restores are pending, please be patient)')
         prev_num_restores = num_restores

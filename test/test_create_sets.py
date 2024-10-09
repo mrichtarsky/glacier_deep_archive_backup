@@ -1,18 +1,19 @@
 #!/usr/bin/env python
 
-from impl.create_sets import crawl, SetWriter, glob_backup_paths
-from impl.tools import BackupException
-from impl.upload_sets import build_archive, get_list_files
-
 import os
 import pickle
-import pytest
 import random
 import shutil
 import string
 import subprocess
 import sys
 import time
+
+import pytest
+
+from impl.create_sets import SetWriter, crawl, glob_backup_paths
+from impl.tools import BackupException
+from impl.upload_sets import build_archive, get_list_files
 
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
 WORK_PATH = os.path.join(SCRIPT_PATH, 'work')
@@ -22,15 +23,16 @@ subprocess.run(('sudo', 'mount', '-t', 'tmpfs', '-o', 'size=1024m',
 
 POOL_PATH = os.path.join(WORK_PATH, 'pool')
 ZFS_POOL = 'tank'
-SNAPSHOT_PATHS = (
-    '/glacier_deep_archive_backup_test',
-    '/mnt/glacier_deep_archive_backup_test')
+SNAPSHOT_PATHS = ('/glacier_deep_archive_backup_test',
+                  '/mnt/glacier_deep_archive_backup_test')
 SET_PATH = os.path.join(WORK_PATH, 'sets')
 REPRO_PATH = os.path.join(SCRIPT_PATH, 'state', 'repro.pickle.')
 os.makedirs(os.path.dirname(REPRO_PATH), exist_ok=True)
 
+
 class TestException(Exception):
     pass
+
 
 def create_files(items):
     for item_path, size in items:
@@ -42,9 +44,11 @@ def create_files(items):
             with open(os.path.join(POOL_PATH, item_path), 'wt') as f:
                 f.write('x' * size)
 
-def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylint: disable=too-many-statements
-                                upload_limit, num_expected_warnings,
-                                num_expected_sets, num_expected_files):
+
+# pylint: disable=too-many-statements
+def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_limit,
+                                num_expected_warnings, num_expected_sets,
+                                num_expected_files):
     snapshot_path = os.path.normpath(snapshot_path)
     backup_paths_unglobbed = tuple(map(os.path.normpath, backup_paths))
 
@@ -57,11 +61,12 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
     subprocess.run(('sudo', 'rm', '-f', snapshot_path), check=True)
     subprocess.run(('sudo', 'ln', '-s', POOL_PATH, snapshot_path), check=True)
 
-    backup_paths, num_warnings = glob_backup_paths(backup_paths_unglobbed, snapshot_path)
+    backup_paths, num_warnings = glob_backup_paths(backup_paths_unglobbed,
+                                                   snapshot_path)
 
     if num_expected_warnings is not None and num_expected_warnings != num_warnings:
-        raise TestException(f"Mismatch: num_expected_warnings={num_expected_warnings}"
-                        f", num_warnings={num_warnings}")
+        raise TestException(f'Mismatch: num_expected_warnings={num_expected_warnings}'
+                            f', num_warnings={num_warnings}')
 
     set_writer = SetWriter(snapshot_path, SET_PATH, ZFS_POOL)
     root_node = crawl(snapshot_path, backup_paths, upload_limit)
@@ -75,7 +80,8 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
         raise TestException('backup_paths not empty, but no set files found')
 
     if num_expected_sets is not None and len(list_files) != num_expected_sets:
-        raise TestException(f"Wrong number of sets={len(list_files)}, expected={num_expected_sets}")
+        raise TestException(f'Wrong number of sets={len(list_files)}'
+                            f', expected={num_expected_sets}')
 
     archive_paths = []
     for list_file in list_files:
@@ -86,8 +92,9 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
     os.makedirs(extract_path, exist_ok=True)
 
     for archive_path in archive_paths:
-        print(f"Extracting {archive_path}")
-        cmd = (os.path.join(SCRIPT_PATH, '..', 'extract_archive'), archive_path, extract_path)
+        print(f'Extracting {archive_path}')
+        extract_archive_path = os.path.join(SCRIPT_PATH, '..', 'extract_archive')
+        cmd = (extract_archive_path, archive_path, extract_path)
         subprocess.run(cmd, check=True)
 
     def raise_error(error):
@@ -96,11 +103,11 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
     # If specified, number of files must match
     if num_expected_files is not None:
         num_files = 0
-        for _, _, files in os.walk(extract_path, topdown=False,
-                                   onerror=raise_error, followlinks=False):
+        for _, _, files in os.walk(extract_path, topdown=False, onerror=raise_error,
+                                   followlinks=False):
             num_files += len(files)
         if num_expected_files != num_files:
-            msg = f"Mismatch: num_expected_files={num_expected_files}, num_files={num_files}"
+            msg = f'Mismatch: num_expected_files={num_expected_files}, num_files={num_files}'
             raise TestException(msg)
 
     # Condition 1: All backup paths must be identical
@@ -125,8 +132,8 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
     extra_files = []
     extra_dirs = []
 
-    for root, dirs, files in os.walk(extract_path, topdown=False,
-                                     onerror=raise_error, followlinks=False):
+    for root, dirs, files in os.walk(extract_path, topdown=False, onerror=raise_error,
+                                     followlinks=False):
         for file_ in files:
             extra_files.append(os.path.relpath(os.path.join(root, file_), extract_path))
         for dir_ in dirs:
@@ -140,8 +147,9 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, # pylin
                 extra_dirs.append(rel_path)
 
     if len(extra_files) > 0 or len(extra_dirs) > 0:
-        raise TestException(f"Extract dir {extract_path} has extraneous items:"
-                        f" files={extra_files}, dirs={extra_dirs}")
+        raise TestException(f'Extract dir {extract_path} has extraneous items:'
+                            f' files={extra_files}, dirs={extra_dirs}')
+
 
 def run_test(pool_files, backup_paths, upload_limit, num_expected_warnings=None,
              num_expected_sets=None, num_expected_files=None, is_fuzz_run=False):
@@ -154,40 +162,45 @@ def run_test(pool_files, backup_paths, upload_limit, num_expected_warnings=None,
             if is_fuzz_run:
                 i = 0
                 while 1:
-                    repro_path = f"{REPRO_PATH}{i}"
+                    repro_path = f'{REPRO_PATH}{i}'
                     i += 1
                     if not os.path.exists(repro_path):
                         break
                 with open(repro_path, 'wb') as f:
-                    pickle.dump((snapshot_path, pool_files, backup_paths, upload_limit), f)
+                    repro_info = (snapshot_path, pool_files, backup_paths, upload_limit)
+                    pickle.dump(repro_info, f)
                 print(f"Wrote reproducer to '{repro_path}', run"
                       f" '{__file__} --repro {repro_path}' to reproduce")
             raise
 
+
 # Letters: directories, numbers: files
 # Trailing slash means directory
 SIZE_SMALL = 10
+
 
 def test_empty():
     pool_files = ()
 
     run_test(pool_files, (), SIZE_SMALL)
 
-def test_one_set_single_file():
-    pool_files = (
-        ('a/1', SIZE_SMALL),
-    )
 
-    run_test(pool_files, ('a', ), SIZE_SMALL, num_expected_sets=1, num_expected_files=1)
+def test_one_set_single_file():
+    pool_files = (('a/1', SIZE_SMALL),)
+
+    run_test(pool_files, ('a',), SIZE_SMALL, num_expected_sets=1, num_expected_files=1)
+
 
 def test_one_set_multiple_files():
     pool_files = (
         ('a/1', SIZE_SMALL),
         ('a/2', SIZE_SMALL),
-        ('a/b/3', SIZE_SMALL)
+        ('a/b/3', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('a', ), SIZE_SMALL * 3, num_expected_sets=1, num_expected_files=3)
+    run_test(pool_files, ('a',), SIZE_SMALL * 3, num_expected_sets=1,
+             num_expected_files=3)
+
 
 def test_three_dirs_include_two():
     pool_files = (
@@ -196,7 +209,9 @@ def test_three_dirs_include_two():
         ('c/3', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('a', 'c'), SIZE_SMALL * 3, num_expected_sets=1, num_expected_files=2)
+    run_test(pool_files, ('a', 'c'), SIZE_SMALL * 3, num_expected_sets=1,
+             num_expected_files=2)
+
 
 def test_file_and_subdir():
     pool_files = (
@@ -204,7 +219,8 @@ def test_file_and_subdir():
         ('a/b/2', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('a', ), SIZE_SMALL, num_expected_sets=2, num_expected_files=2)
+    run_test(pool_files, ('a',), SIZE_SMALL, num_expected_sets=2, num_expected_files=2)
+
 
 def test_top_level_files_one_set():
     pool_files = (
@@ -212,7 +228,9 @@ def test_top_level_files_one_set():
         ('2', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('1', '2'), SIZE_SMALL*2, num_expected_sets=1, num_expected_files=2)
+    run_test(pool_files, ('1', '2'), SIZE_SMALL * 2, num_expected_sets=1,
+             num_expected_files=2)
+
 
 def test_top_level_files_two_sets():
     pool_files = (
@@ -220,7 +238,9 @@ def test_top_level_files_two_sets():
         ('2', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('1', '2'), SIZE_SMALL, num_expected_sets=2, num_expected_files=2)
+    run_test(pool_files, ('1', '2'), SIZE_SMALL, num_expected_sets=2,
+             num_expected_files=2)
+
 
 def test_top_level_files_and_dirs():
     pool_files = (
@@ -232,17 +252,22 @@ def test_top_level_files_and_dirs():
         ('d/e/f/g/6', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('1', '2', 'a', 'c', 'd'), SIZE_SMALL * 2, num_expected_sets=3, num_expected_files=6)
-    run_test(pool_files, ('1', '2', 'a', 'c', 'd'), SIZE_SMALL, num_expected_sets=6, num_expected_files=6)
-    run_test(pool_files, ('1', 'a', 'c', 'd'), SIZE_SMALL * 2, num_expected_sets=3, num_expected_files=5)
-    run_test(pool_files, ('1', 'a', 'd'), SIZE_SMALL * 2, num_expected_sets=2, num_expected_files=4)
-    run_test(pool_files, ('2', 'a', 'd'), SIZE_SMALL * 2, num_expected_sets=2, num_expected_files=4)
-    run_test(pool_files, ('1', 'a', 'c'), SIZE_SMALL * 2, num_expected_sets=2, num_expected_files=4)
+    run_test(pool_files, ('1', '2', 'a', 'c', 'd'), SIZE_SMALL * 2, num_expected_sets=3,
+             num_expected_files=6)
+    run_test(pool_files, ('1', '2', 'a', 'c', 'd'), SIZE_SMALL, num_expected_sets=6,
+             num_expected_files=6)
+    run_test(pool_files, ('1', 'a', 'c', 'd'), SIZE_SMALL * 2, num_expected_sets=3,
+             num_expected_files=5)
+    run_test(pool_files, ('1', 'a', 'd'), SIZE_SMALL * 2, num_expected_sets=2,
+             num_expected_files=4)
+    run_test(pool_files, ('2', 'a', 'd'), SIZE_SMALL * 2, num_expected_sets=2,
+             num_expected_files=4)
+    run_test(pool_files, ('1', 'a', 'c'), SIZE_SMALL * 2, num_expected_sets=2,
+             num_expected_files=4)
+
 
 def test_file_size_exceeds_upload_limit_throws():
-    pool_files = (
-        ('1', SIZE_SMALL),
-    )
+    pool_files = (('1', SIZE_SMALL),)
 
     try:
         run_test(pool_files, ('1',), SIZE_SMALL - 1)
@@ -250,13 +275,16 @@ def test_file_size_exceeds_upload_limit_throws():
     except BackupException:
         pass
 
+
 def test_path_fits_but_only_one_file_included():
     pool_files = (
         ('a/b/1', SIZE_SMALL),
         ('a/b/2', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('a/b/1',), SIZE_SMALL * 2, num_expected_sets=1, num_expected_files=1)
+    run_test(pool_files, ('a/b/1',), SIZE_SMALL * 2, num_expected_sets=1,
+             num_expected_files=1)
+
 
 def test_path_fits_but_only_one_subdir_included():
     pool_files = (
@@ -264,35 +292,35 @@ def test_path_fits_but_only_one_subdir_included():
         ('a/c/2', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('a/b',), SIZE_SMALL * 2, num_expected_sets=1, num_expected_files=1)
+    run_test(pool_files, ('a/b',), SIZE_SMALL * 2, num_expected_sets=1,
+             num_expected_files=1)
+
 
 def test_empty_dir():
-    pool_files = (
-        ('a/', 0),
-    )
+    pool_files = (('a/', 0),)
 
     run_test(pool_files, ('a',), SIZE_SMALL, num_expected_sets=1, num_expected_files=0)
 
-def test_dir_specified_multiple_times():
-    pool_files = (
-        ('a/1', SIZE_SMALL),
-    )
 
-    run_test(pool_files, ('a', 'a'), SIZE_SMALL, num_expected_sets=1, num_expected_files=1)
+def test_dir_specified_multiple_times():
+    pool_files = (('a/1', SIZE_SMALL),)
+
+    run_test(pool_files, ('a', 'a'), SIZE_SMALL, num_expected_sets=1,
+             num_expected_files=1)
+
 
 def test_file_specified_multiple_times():
-    pool_files = (
-        ('1', SIZE_SMALL),
-    )
+    pool_files = (('1', SIZE_SMALL),)
 
-    run_test(pool_files, ('1', '1'), SIZE_SMALL, num_expected_sets=1, num_expected_files=1)
+    run_test(pool_files, ('1', '1'), SIZE_SMALL, num_expected_sets=1,
+             num_expected_files=1)
+
 
 def test_dir_trailing_slash():
-    pool_files = (
-        ('a/', 0),
-    )
+    pool_files = (('a/', 0),)
 
     run_test(pool_files, ('a/',), SIZE_SMALL, num_expected_sets=1, num_expected_files=0)
+
 
 def test_glob_files_current_dir_star():
     pool_files = (
@@ -301,7 +329,9 @@ def test_glob_files_current_dir_star():
         ('____2.py', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('*.py',), SIZE_SMALL, num_expected_sets=2, num_expected_files=2)
+    run_test(pool_files, ('*.py',), SIZE_SMALL, num_expected_sets=2,
+             num_expected_files=2)
+
 
 def test_glob_files_current_dir_star_suffix():
     pool_files = (
@@ -310,7 +340,9 @@ def test_glob_files_current_dir_star_suffix():
         ('____2.py', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('1*',), SIZE_SMALL * 2, num_expected_sets=1, num_expected_files=2)
+    run_test(pool_files, ('1*',), SIZE_SMALL * 2, num_expected_sets=1,
+             num_expected_files=2)
+
 
 def test_glob_files_current_dir_question_mark():
     pool_files = (
@@ -319,7 +351,9 @@ def test_glob_files_current_dir_question_mark():
         ('2.py', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('?.py',), SIZE_SMALL, num_expected_sets=2, num_expected_files=2)
+    run_test(pool_files, ('?.py',), SIZE_SMALL, num_expected_sets=2,
+             num_expected_files=2)
+
 
 def test_glob_dirs_current_dir_star():
     pool_files = (
@@ -328,7 +362,9 @@ def test_glob_dirs_current_dir_star():
         ('_--aa/2.py', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('*a*',), SIZE_SMALL, num_expected_sets=2, num_expected_files=2)
+    run_test(pool_files, ('*a*',), SIZE_SMALL, num_expected_sets=2,
+             num_expected_files=2)
+
 
 def test_glob_dirs_current_dir_question_mark():
     pool_files = (
@@ -339,6 +375,7 @@ def test_glob_dirs_current_dir_question_mark():
 
     run_test(pool_files, ('?a',), SIZE_SMALL, num_expected_sets=2, num_expected_files=2)
 
+
 def test_glob_files_subdir_star():
     pool_files = (
         ('a/1.py', SIZE_SMALL),
@@ -346,7 +383,9 @@ def test_glob_files_subdir_star():
         ('a/2.py', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('a/*.sh',), SIZE_SMALL, num_expected_sets=1, num_expected_files=1)
+    run_test(pool_files, ('a/*.sh',), SIZE_SMALL, num_expected_sets=1,
+             num_expected_files=1)
+
 
 def test_glob_files_subdir_question_mark():
     pool_files = (
@@ -355,7 +394,9 @@ def test_glob_files_subdir_question_mark():
         ('a/2.py', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('a/??sh',), SIZE_SMALL, num_expected_sets=1, num_expected_files=1)
+    run_test(pool_files, ('a/??sh',), SIZE_SMALL, num_expected_sets=1,
+             num_expected_files=1)
+
 
 def test_glob_dirs_subdir_star():
     pool_files = (
@@ -365,7 +406,9 @@ def test_glob_dirs_subdir_star():
         ('d_long/e/4.py', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('a_long/*c/*sh',), SIZE_SMALL * 2, num_expected_sets=1, num_expected_files=1)
+    run_test(pool_files, ('a_long/*c/*sh',), SIZE_SMALL * 2, num_expected_sets=1,
+             num_expected_files=1)
+
 
 def test_glob_dirs_subdir_question_mark():
     pool_files = (
@@ -376,7 +419,9 @@ def test_glob_dirs_subdir_question_mark():
         ('d_long/e/5.py', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('a_long/?/*py',), SIZE_SMALL * 2, num_expected_sets=1, num_expected_files=2)
+    run_test(pool_files, ('a_long/?/*py',), SIZE_SMALL * 2, num_expected_sets=1,
+             num_expected_files=2)
+
 
 def test_glob_dirs_recursive():
     pool_files = (
@@ -392,9 +437,13 @@ def test_glob_dirs_recursive():
         ('5.pyc', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('**/*py',), SIZE_SMALL * 3, num_expected_sets=2, num_expected_files=5)
-    run_test(pool_files, ('**/1.*',), SIZE_SMALL, num_expected_sets=2, num_expected_files=2)
-    run_test(pool_files, ('**/?.???',), SIZE_SMALL * 2, num_expected_sets=2, num_expected_files=3)
+    run_test(pool_files, ('**/*py',), SIZE_SMALL * 3, num_expected_sets=2,
+             num_expected_files=5)
+    run_test(pool_files, ('**/1.*',), SIZE_SMALL, num_expected_sets=2,
+             num_expected_files=2)
+    run_test(pool_files, ('**/?.???',), SIZE_SMALL * 2, num_expected_sets=2,
+             num_expected_files=3)
+
 
 def test_no_match():
     pool_files = (
@@ -403,15 +452,21 @@ def test_no_match():
         ('aa/2.py', SIZE_SMALL),
     )
 
-    run_test(pool_files, ('xyz',), SIZE_SMALL, num_expected_warnings=1, num_expected_files=0)
-    run_test(pool_files, ('xyz', 'rs'), SIZE_SMALL, num_expected_warnings=2, num_expected_files=0)
+    run_test(pool_files, ('xyz',), SIZE_SMALL, num_expected_warnings=1,
+             num_expected_files=0)
+    run_test(pool_files, ('xyz', 'rs'), SIZE_SMALL, num_expected_warnings=2,
+             num_expected_files=0)
 
-    run_test(pool_files, ('aa/xyz',), SIZE_SMALL, num_expected_warnings=1, num_expected_files=0)
+    run_test(pool_files, ('aa/xyz',), SIZE_SMALL, num_expected_warnings=1,
+             num_expected_files=0)
 
     # globs
-    run_test(pool_files, ('xyz*',), SIZE_SMALL, num_expected_warnings=1, num_expected_files=0)
-    run_test(pool_files, ('*xyz',), SIZE_SMALL, num_expected_warnings=1, num_expected_files=0)
-    run_test(pool_files, ('aa/xyz',), SIZE_SMALL, num_expected_warnings=1, num_expected_files=0)
+    run_test(pool_files, ('xyz*',), SIZE_SMALL, num_expected_warnings=1,
+             num_expected_files=0)
+    run_test(pool_files, ('*xyz',), SIZE_SMALL, num_expected_warnings=1,
+             num_expected_files=0)
+    run_test(pool_files, ('aa/xyz',), SIZE_SMALL, num_expected_warnings=1,
+             num_expected_files=0)
 
 
 def do_test_fuzz():
@@ -432,7 +487,7 @@ def do_test_fuzz():
 
     dirs_set = set(dirs)
     # Explicitly create all dirs, so we have empty ones
-    pool_files = [ (dir_, 0) for dir_ in dirs]
+    pool_files = [(dir_, 0) for dir_ in dirs]
     for _ in range(num_files):
         if len(dirs) > 0:
             dir_path = random.choice(dirs)
@@ -453,20 +508,24 @@ def do_test_fuzz():
 
     run_test(pool_files, backup_paths, upload_limit, is_fuzz_run=True)
 
+
 def do_test_fuzz_n(num_runs):
     t1 = time.time()
     for _ in range(num_runs):
         do_test_fuzz()
-    print(f"{num_runs} runs took {time.time()-t1} sec")
+    print(f'{num_runs} runs took {time.time()-t1} sec')
 
     return num_runs
+
 
 def test_fuzz_quick():
     return do_test_fuzz_n(2)
 
+
 @pytest.mark.longrunner
 def test_fuzz_long():
     return do_test_fuzz_n(100)
+
 
 if __name__ == '__main__':
     if '--repro' in sys.argv:
@@ -481,7 +540,7 @@ if __name__ == '__main__':
             while 1:
                 total_runs += test_fuzz_long()
         finally:
-            print(f"Runs: {total_runs}")
+            print(f'Runs: {total_runs}')
     else:
         print('Valid args: --repro, --fuzz')
 

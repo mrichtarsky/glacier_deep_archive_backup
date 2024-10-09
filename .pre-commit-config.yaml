@@ -1,0 +1,99 @@
+# How to use:
+# $ pip install pre-commit
+# $ cd $git_repo; pre-commit install
+#
+# To check all files:
+# $ pre-commit run --all-files
+repos:
+
+#
+# Common
+#
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.6.0  # Use the ref you want to point at
+  hooks:
+  - id: check-added-large-files
+  - id: check-executables-have-shebangs
+  - id: check-merge-conflict
+  - id: check-shebang-scripts-are-executable
+  - id: check-symlinks
+  - id: check-toml
+  - id: check-xml
+  - id: check-yaml
+  - id: debug-statements  # Python
+  - id: detect-aws-credentials
+  - id: detect-private-key
+  - id: double-quote-string-fixer
+  - id: end-of-file-fixer
+  - id: mixed-line-ending
+    args: [--fix=no]
+  - id: trailing-whitespace
+
+# For ignoring false positives see
+# https://github.com/crate-ci/typos?tab=readme-ov-file#false-positives
+- repo: https://github.com/crate-ci/typos
+  rev: v1.24.6
+  hooks:
+  - id: typos
+
+#
+# Python
+#
+- repo: https://github.com/pycqa/isort
+  rev: 5.13.2
+  hooks:
+  - id: isort
+    name: isort (python)
+
+- repo: https://github.com/google/yapf
+  rev: v0.40.2
+  hooks:
+  - id: yapf
+
+- repo: local
+  hooks:
+  # pylint: https://pylint.pycqa.org/en/latest/user_guide/installation/pre-commit-integration.html
+  - id: pylint
+    name: pylint
+    entry: bash -c 'PYTHONPATH=/r/lib/python:/repos/secrets pylint $@'
+    language: system
+    types: [python]
+    require_serial: true
+    args: [
+      "-rn", # Only display messages
+      "-sn", # Don't display the score
+      "-d invalid-name",
+      "-d line-too-long",
+      "-d missing-function-docstring",
+      "-d missing-class-docstring",
+      "-d missing-module-docstring",
+      "-d redefined-outer-name",
+      "-d too-few-public-methods",
+      "-d too-many-locals",
+      "-d unspecified-encoding",
+      "-d wrong-import-order",
+      "-d too-many-arguments",
+      "-d too-many-branches",
+      "-d too-many-positional-arguments",
+      "-d too-many-statements",
+    ]
+
+#
+# Shell
+#
+- repo: https://github.com/shellcheck-py/shellcheck-py
+  rev: v0.10.0.1
+  hooks:
+  - id: shellcheck
+    args: [
+      "-eSC1090,SC1091,SC2002",
+      "-sbash",
+    ]
+
+#
+# JSON with comments
+#
+- repo: https://gitlab.com/bmares/check-json5
+  rev: v1.0.0
+  hooks:
+  - id: check-json5

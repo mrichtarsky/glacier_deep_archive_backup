@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 '''
 Ran by do_backup_to_aws.sh
 
@@ -12,11 +11,7 @@ SNAPSHOT_PATH is where the ZFS snapshot is mounted.
 Sets are processed later by upload_sets.py.
 '''
 
-from impl.tools import BackupException, make_set_info_filename, size_to_string
-
-import binpacking
 import copy
-from functools import lru_cache
 import json
 import os
 import pathlib
@@ -25,6 +20,12 @@ import re
 import stat
 import subprocess
 import sys
+from functools import lru_cache
+
+import binpacking
+
+from impl.tools import BackupException, make_set_info_filename, size_to_string
+
 
 class SetWriter():
     def __init__(self, snapshot_path, set_path, zfs_pool):
@@ -51,35 +52,36 @@ class SetWriter():
         return name
 
     def write_set(self, set_index, num_sets, items, size, num_dirs, num_files):
-        print(f"Set {set_index+1}/{num_sets}: {len(items)} path(s), {size_to_string(size)}"
-              f", {num_dirs} dir(s), {num_files} file(s)")
+        print(f'Set {set_index+1}/{num_sets}: {len(items)} path(s), {size_to_string(size)}'
+              f', {num_dirs} dir(s), {num_files} file(s)')
         archive_name = self._make_archive_name(items)
 
         counter = 0
         while True:
             list_filename = os.path.join(self.set_path,
-                                        f"{archive_name}_{counter:03d}.list")
+                                         f'{archive_name}_{counter:03d}.list')
             if not os.path.exists(list_filename):
                 break
             counter += 1
 
-        print(f"  Archive name: {archive_name}_{counter:03d}")
+        print(f'  Archive name: {archive_name}_{counter:03d}')
 
         num_files_printed = 0
         with open(list_filename, 'wt') as list_file:
             for item in items:
                 item = os.path.relpath(item, self.snapshot_path)
                 if num_files_printed < 10:
-                    print(f"  {item}")
+                    print(f'  {item}')
                     num_files_printed += 1
                 print(item, file=list_file)
         if len(items) > num_files_printed:
-            print(f"  ... ({len(items)-num_files_printed} more)")
+            print(f'  ... ({len(items)-num_files_printed} more)')
 
         info_filename = make_set_info_filename(list_filename)
         with open(info_filename, 'wt') as info_file:
-            info = { 'size_bytes': size }
+            info = {'size_bytes': size}
             json.dump(info, info_file)
+
 
 class Path():
     def __init__(self, name, parent, upload_limit):
@@ -88,21 +90,21 @@ class Path():
         self.upload_limit = upload_limit
         self.files = set()
         self.dirs = {}
-        self.size = None # Lazily computed
+        self.size = None  # Lazily computed
 
     def add_file(self, name, size):
         if name in ('.', '..', ''):
-            raise BackupException(f"Invalid filename {name}")
+            raise BackupException(f'Invalid filename {name}')
 
         if size > self.upload_limit:
-            raise BackupException(f"File size exceeds upload limit: {self.get_full_path()}/{name}"
-                                  f" (size={size_to_string(size)}, "
-                                  f"upload_limit={size_to_string(self.upload_limit)})")
+            raise BackupException(f'File size exceeds upload limit: {self.get_full_path()}/{name}'
+                                  f' (size={size_to_string(size)}, '
+                                  f'upload_limit={size_to_string(self.upload_limit)})')
         self.files.add((name, size))
 
     def get_dir(self, name):
         if name in ('.', '..', ''):
-            raise BackupException(f"Invalid dirname {name}")
+            raise BackupException(f'Invalid dirname {name}')
 
         return self.dirs.setdefault(name, Path(name, self, self.upload_limit))
 
@@ -134,14 +136,15 @@ class Path():
             out += str(dir_)
         if len(self.files) > 0:
             path = self.get_full_path()
-            out += '\n'.join(map(lambda file_: os.path.join(path, file_[0]), self.files)) + '\n'
+            out += '\n'.join(map(lambda file_: os.path.join(path, file_[0]),
+                                 self.files)) + '\n'
         return out
 
     def _is_inside_backup_paths(self, backup_paths, path):
         snapshot_path = self.get_snapshot_path()
         rel_path = os.path.relpath(path, snapshot_path)
         for backup_path in backup_paths:
-            exact_match = backup_path == rel_path # File or path
+            exact_match = backup_path == rel_path  # File or path
             path_prefix_match = rel_path.startswith(os.path.join(backup_path, ''))
             if exact_match or path_prefix_match:
                 return True
@@ -151,14 +154,14 @@ class Path():
         if self.parent is None:
             path = os.path.relpath(path, self.name)
         node = self
-        if len(path) > 0 and path != '.': # relpath returns '.' for top level dir
+        if len(path) > 0 and path != '.':  # relpath returns '.' for top level dir
             comps = path.split('/')
             for comp in comps:
                 node = node.get_dir(comp)
         return node
 
     def get_num_dirs_files(self):
-        num_dirs = 1 # Including current dir
+        num_dirs = 1  # Including current dir
         num_files = len(self.files)
         for dir_node in self.dirs.values():
             num_dirs_subdir, num_files_subdir = dir_node.get_num_dirs_files()
@@ -175,7 +178,8 @@ class Path():
         DIR, FILE = 0, 1
         # When the path fits, we still cannot simply zip it up fully
         # since only a subset of entries may be in the backup_paths.
-        if size <= self.upload_limit and self._is_inside_backup_paths(backup_paths, path):
+        if (size <= self.upload_limit
+                and self._is_inside_backup_paths(backup_paths, path)):
             items.append((path, size, DIR))
         else:
             for file_, size in self.files:
@@ -193,7 +197,6 @@ class Path():
                     else:
                         dir_items = dir_.create_backup_sets(set_writer, backup_paths)
                         items.extend(dir_items)
-
 
         if self.parent is not None:
             return items
@@ -215,9 +218,11 @@ class Path():
                         num_files += num_files_subdir
                     else:
                         num_files += 1
-                set_writer.write_set(bin_index, len(bins), paths, total_size, num_dirs, num_files)
+                set_writer.write_set(bin_index, len(bins), paths, total_size, num_dirs,
+                                     num_files)
 
         return None
+
 
 class DualCounter:
     def __init__(self, title, name1, name2):
@@ -239,9 +244,9 @@ class DualCounter:
 
     def verify(self):
         if self.count1 != self.count2:
-            msg = (f"Mismatch: {self.title}: {self.name1}={self.count1}, "
-                   f"{self.name2}={self.count2}, "
-                   f"diff: {self.count1 - self.count2}")
+            msg = (f'Mismatch: {self.title}: {self.name1}={self.count1}, '
+                   f'{self.name2}={self.count2}, '
+                   f'diff: {self.count1 - self.count2}')
             raise BackupException(msg)
 
     def __add__(self, rhs):
@@ -250,14 +255,15 @@ class DualCounter:
         result.count2 += rhs.count2
         return result
 
+
 def update_find_counters(path, sub_num_files, sub_size_files):
     cmd = fr"find '{path}' \( -type f -o -type l \) | wc -l"
     output = subprocess.check_output(cmd, shell=True).decode()
     sub_num_files.add_counter2(int(output.strip()))
     sub_num_files.verify()
 
-    cmd = ( fr"find '{path}' \( -type f -o -type l \) -printf '%s\n' "
-            f"| awk '{{sum+=$1}} END {{print sum}}'")
+    cmd = (fr"find '{path}' \( -type f -o -type l \) -printf '%s\n' "
+           f"| awk '{{sum+=$1}} END {{print sum}}'")
     output = subprocess.check_output(cmd, shell=True).decode()
     output = output.strip()
     if len(output) == 0:
@@ -267,6 +273,7 @@ def update_find_counters(path, sub_num_files, sub_size_files):
     sub_size_files.add_counter2(size)
     sub_size_files.verify()
 
+
 def crawl(snapshot_path, backup_paths, upload_limit):
     root_node = Path(snapshot_path, None, upload_limit)
 
@@ -275,16 +282,16 @@ def crawl(snapshot_path, backup_paths, upload_limit):
 
     for path in backup_paths:
         path = os.path.join(snapshot_path, path)
-        print(f"Crawling {path}")
+        print(f'Crawling {path}')
 
         sub_num_files = DualCounter('subfiles', 'walk', 'find')
         sub_size_files = DualCounter('subsize', 'walk', 'find')
 
         def process_file(node, file_path):
-            info = os.lstat(file_path) # Do not follow symlinks
-            sub_num_files.add_counter1(1) # pylint: disable=cell-var-from-loop
+            info = os.lstat(file_path)  # Do not follow symlinks
+            sub_num_files.add_counter1(1)  # pylint: disable=cell-var-from-loop
             file_size = info[stat.ST_SIZE]
-            sub_size_files.add_counter1(file_size) # pylint: disable=cell-var-from-loop
+            sub_size_files.add_counter1(file_size)  # pylint: disable=cell-var-from-loop
 
             file_ = os.path.basename(file_path)
             node.add_file(file_, file_size)
@@ -293,11 +300,12 @@ def crawl(snapshot_path, backup_paths, upload_limit):
             node = root_node.get_node(os.path.dirname(path))
             process_file(node, path)
         else:
+
             def raise_error(error):
                 raise error
 
-            for root, _, files in os.walk(path, topdown=False,
-                                          onerror=raise_error, followlinks=False):
+            for root, _, files in os.walk(path, topdown=False, onerror=raise_error,
+                                          followlinks=False):
 
                 node = root_node.get_node(root)
                 for file_ in files:
@@ -308,12 +316,13 @@ def crawl(snapshot_path, backup_paths, upload_limit):
         num_files += sub_num_files
         size_files += sub_size_files
 
-        print(f"  {size_to_string(sub_size_files.get())}, {sub_num_files.get()} files")
+        print(f'  {size_to_string(sub_size_files.get())}, {sub_num_files.get()} files')
 
     num_files.verify()
     size_files.verify()
 
     return root_node
+
 
 def glob_backup_paths(backup_paths_unglobbed, snapshot_path):
     backup_paths = []
@@ -322,21 +331,23 @@ def glob_backup_paths(backup_paths_unglobbed, snapshot_path):
     for path_unglobbed in backup_paths_unglobbed:
         paths_globbed = tuple(base_path.glob(path_unglobbed))
         if len(paths_globbed) == 0:
-            print(f"WARNING: Path {path_unglobbed} does not exist and will be ignored!")
+            print(f'WARNING: Path {path_unglobbed} does not exist and will be ignored!')
             num_warnings += 1
         for path_globbed in paths_globbed:
             backup_paths.append(os.fspath(path_globbed.relative_to(base_path)))
     return backup_paths, num_warnings
+
 
 def crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file):
     root_node = crawl(snapshot_path, backup_paths, upload_limit)
     with open(state_file, 'wb') as f:
         pickle.dump(root_node, f)
 
+
 def load(state_file, set_writer, backup_paths):
     with open(state_file, 'rb') as f:
         root_node = pickle.load(f)
-    print(f"Total size of backed up files: {size_to_string(root_node.get_size())}")
+    print(f'Total size of backed up files: {size_to_string(root_node.get_size())}')
     root_node.create_backup_sets(set_writer, backup_paths)
 
 
@@ -348,10 +359,11 @@ if __name__ == '__main__':
     set_path = os.path.normpath(os.environ['SET_PATH'])
     upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
 
-    backup_paths, num_warnings = glob_backup_paths(backup_paths_unglobbed, snapshot_path)
+    backup_paths, num_warnings = glob_backup_paths(backup_paths_unglobbed,
+                                                   snapshot_path)
     if num_warnings > 0 and os.environ.get('IGNORE_WARNINGS') != '1':
-        res = input(f"{num_warnings} warning(s) encountered, see above."
-                    " Proceed? (IGNORE_WARNINGS=1 skips this) [y/n] ").strip().lower()
+        res = input(f'{num_warnings} warning(s) encountered, see above.'
+                    ' Proceed? (IGNORE_WARNINGS=1 skips this) [y/n] ').strip().lower()
         if res != 'y':
             print('ABORTED')
             sys.exit(1)
