@@ -1,6 +1,13 @@
 [tool.isort]
 line_length = 88
 
+[tool.pytest.ini_options]
+markers = 'longrunner: test runs for a long time (>10min)'
+filterwarnings = [
+    "ignore:cannot collect test class 'TestException':",
+    'ignore:the imp module is deprecated in favour of importlib:DeprecationWarning',
+]
+
 [tool.yapf]
 # Note: Only things in parenthesis get split to the next line
 # This affects import, calculations, bitwise ops

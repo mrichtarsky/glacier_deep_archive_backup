@@ -519,12 +519,13 @@ def do_test_fuzz_n(num_runs):
 
 
 def test_fuzz_quick():
-    return do_test_fuzz_n(2)
+    do_test_fuzz_n(2)
 
 
 @pytest.mark.longrunner
 def test_fuzz_long():
-    return do_test_fuzz_n(100)
+    FUZZ_LONG_NUM_RUNS = 100
+    do_test_fuzz_n(FUZZ_LONG_NUM_RUNS)
 
 
 if __name__ == '__main__':
@@ -538,7 +539,8 @@ if __name__ == '__main__':
         total_runs = 0
         try:
             while 1:
-                total_runs += test_fuzz_long()
+                test_fuzz_long()
+                total_runs += test_fuzz_long.FUZZ_LONG_NUM_RUNS
         finally:
             print(f'Runs: {total_runs}')
     else:
