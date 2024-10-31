@@ -8,10 +8,5 @@ export PYTHONUNBUFFERED=1
 pushd "$ROOT" >/dev/null
 trap 'popd >/dev/null' EXIT
 
-if [[ ! -s state/resumable ]]; then
-    echo "Not able to resume, please run ./backup_scratch first!"
-    exit 1
-fi
-
 impl/do_backup_to_aws.sh resume 2>&1 | tee -i logs/backup_resume.log
 echo "OK"

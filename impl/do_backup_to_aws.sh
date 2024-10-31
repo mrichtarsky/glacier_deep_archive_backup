@@ -3,7 +3,7 @@ set -euo pipefail
 
 MODE=$1
 
-RESUME_FILE=state/resumable
+RESUME_FILE=state/resume_info
 
 if [[ "$MODE" == scratch ]]; then
     SETTINGS=$2
@@ -11,6 +11,11 @@ if [[ "$MODE" == scratch ]]; then
     echo "Scratch backup"
 elif [[ "$MODE" == resume ]]; then
     echo "Resuming"
+    if [[ ! -s "$RESUME_FILE" ]]; then
+        echo "Not able to resume, please run ./backup_scratch first!"
+        exit 1
+    fi
+
     source "$RESUME_FILE"
 else
     echo "Invalid mode argument: $MODE"
