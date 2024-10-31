@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 2 ]]; then
-    echo "Usage: ./backup_resume SETTINGS_FILE TIMESTAMP"
-    echo "  Example: ./backup_resume config/backup.sh 2022-02-22-220022"
+if [[ $# -ne 1 ]]; then
+    echo "Usage: ./backup_resume SETTINGS_FILE"
+    echo "  Example: ./backup_resume config/backup.sh"
     exit 1
 fi
 
 SETTINGS=$1
-TIMESTAMP=$2
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PYTHONPATH+=:$ROOT
@@ -22,5 +21,5 @@ if [[ ! -f state/resumable ]]; then
     exit 1
 fi
 
-impl/do_backup_to_aws.sh resume "$SETTINGS" "$TIMESTAMP" 2>&1 | tee -i logs/backup_resume.log
+impl/do_backup_to_aws.sh resume "$SETTINGS" 2>&1 | tee -i logs/backup_resume.log
 echo "OK"
