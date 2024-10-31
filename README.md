@@ -68,7 +68,8 @@ rm main.zip
 
 - Run `./backup_scratch config/backup.sh` to start the backup. Logs are in `logs/backup_scratch.log`.
 - If the backup fails for some reason (e.g. internet down), run `./backup_resume` to continue (logs are in `logs/backup_resume.log`)
-- If you have several pools, simply create a separate `backup_poolname.sh` for each and do a corresponding scratch backup (e.g. `./backup_scratch backup_tank.sh`).
+- If you have several pools, simply create a separate `backup_poolname.sh` for each and do a corresponding scratch backup (e.g. `./backup_scratch backup_tank.sh`). **However, you cannot run backups in parallel since the `state` directory is
+meant to only handle one backup.**
 
 An unprivileged user can run the scripts. Make sure this user has all the necessary permissions for reading the data to be backed up.  Only the following operations are executed as `root`, for which the user must have `sudo` privileges:
 - Creating, mounting, unmounting and destroying the ZFS snapshot
