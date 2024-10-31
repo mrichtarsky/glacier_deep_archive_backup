@@ -34,30 +34,30 @@ mkdir -p "$BUFFER_PATH"
 function cleanup()
 {
     rm -rf "$BUFFER_PATH"
+    sudo umount "$SNAPSHOT_PATH" || true
     if [[ -f state/resumable ]]; then
         echo
-        echo "Error or cancel during processing. Keeping snapshot mounted at $SNAPSHOT_PATH. Please check for any errors that need to be fixed and run './backup_resume $SETTINGS $TIMESTAMP' to retry."
+        echo "Error or cancel during processing. Not destroying snapshot." \
+            "Please check for any errors that need to be fixed and run" \
+            "'./backup_resume $SETTINGS $TIMESTAMP' to retry."
     else
         echo "Destroying snapshot $SNAPSHOT"
-        sudo umount "$SNAPSHOT_PATH" || true
         sudo zfs destroy "$SNAPSHOT"
     fi
 }
 
 if [[ "$MODE" == scratch ]]; then
     rm -f state/resumable
-    sudo zfs snapshot "$SNAPSHOT"
-    trap cleanup EXIT
-    sudo mkdir -p "$SNAPSHOT_PATH"
-    sudo mount -t zfs -o ro "$SNAPSHOT" "$SNAPSHOT_PATH"
-fi
-
-if [[ "$MODE" != resume ]]; then
     rm -f "$SET_PATH"/*
     mkdir -p "$SET_PATH"
-
     rm -f "$STATE_FILE"
+
+    sudo zfs snapshot "$SNAPSHOT"
 fi
+
+sudo mkdir -p "$SNAPSHOT_PATH"
+sudo mount -t zfs -o ro "$SNAPSHOT" "$SNAPSHOT_PATH"
+trap cleanup EXIT
 
 export SET_PATH SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB ZFS_POOL
 
