@@ -7,9 +7,12 @@ SETTINGS=$2
 if [[ "$MODE" == scratch ]]; then
     TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
     echo "Scratch backup, timestamp: $TIMESTAMP (needed if resume is necessary)"
-else
+elif [[ "$MODE" == resume ]]; then
     echo "Resuming"
     TIMESTAMP=$3
+else
+    echo "Invalid mode argument: $MODE"
+    exit 1
 fi
 
 # shellcheck disable=SC1090
@@ -41,7 +44,7 @@ function cleanup()
     fi
 }
 
-if [[ "$MODE" != resume ]]; then
+if [[ "$MODE" == scratch ]]; then
     rm -f state/resumable
     sudo zfs snapshot "$SNAPSHOT"
     trap cleanup EXIT
@@ -58,7 +61,7 @@ fi
 
 export SET_PATH SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB ZFS_POOL
 
-if [[ "$MODE" != resume ]]; then
+if [[ "$MODE" == scratch ]]; then
     impl/create_sets.py "${BACKUP_PATHS[@]}"
 fi
 touch state/resumable
