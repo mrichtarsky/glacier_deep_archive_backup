@@ -67,9 +67,7 @@ rm main.zip
 - Edit `config/passphrase.txt` and put a strong passphrase there. Your data will be encrypted locally using this password before upload. **Make sure this file is only readable/writable by you!**
 
 - Run `./backup_scratch config/backup.sh` to start the backup. Logs are in `logs/backup_scratch.log`.
-- If the backup fails for some reason (e.g. internet down), use `./backup_resume config/backup.sh TIMESTAMP` to resume.
-    - `TIMESTAMP` is the timestamp displayed by the earlier scratch backup run
-    - Logs are in `logs/backup_resume.log`
+- If the backup fails for some reason (e.g. internet down), run `./backup_resume` to continue (logs are in `logs/backup_resume.log`)
 - If you have several pools, simply create a separate `backup_poolname.sh` for each and do a corresponding scratch backup (e.g. `./backup_scratch backup_tank.sh`).
 
 An unprivileged user can run the scripts. Make sure this user has all the necessary permissions for reading the data to be backed up.  Only the following operations are executed as `root`, for which the user must have `sudo` privileges:
@@ -173,8 +171,6 @@ There are other backup solutions that can target Deep Glacier:
 
 # ToDo
 
-- Store timestamp and config for resume
-- Do away with scratch/resume split and just pick off where we left off?
 - Add test for case where archiver thread runs into error
 
 - Add automated E2E test

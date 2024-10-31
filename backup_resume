@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-    echo "Usage: ./backup_resume SETTINGS_FILE"
-    echo "  Example: ./backup_resume config/backup.sh"
-    exit 1
-fi
-
-SETTINGS=$1
-
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PYTHONPATH+=:$ROOT
 export PYTHONUNBUFFERED=1
@@ -16,10 +8,10 @@ export PYTHONUNBUFFERED=1
 pushd "$ROOT" >/dev/null
 trap 'popd >/dev/null' EXIT
 
-if [[ ! -f state/resumable ]]; then
-    echo "Not able to resume, please run ./backup_scratch $SETTINGS first!"
+if [[ ! -s state/resumable ]]; then
+    echo "Not able to resume, please run ./backup_scratch first!"
     exit 1
 fi
 
-impl/do_backup_to_aws.sh resume "$SETTINGS" 2>&1 | tee -i logs/backup_resume.log
+impl/do_backup_to_aws.sh resume 2>&1 | tee -i logs/backup_resume.log
 echo "OK"

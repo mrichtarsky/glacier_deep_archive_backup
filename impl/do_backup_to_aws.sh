@@ -2,16 +2,16 @@
 set -euo pipefail
 
 MODE=$1
-SETTINGS=$2
 
 RESUME_FILE=state/resumable
 
 if [[ "$MODE" == scratch ]]; then
+    SETTINGS=$2
     TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
-    echo "Scratch backup, timestamp: $TIMESTAMP (needed if resume is necessary)"
+    echo "Scratch backup"
 elif [[ "$MODE" == resume ]]; then
     echo "Resuming"
-    TIMESTAMP=$(cat "$RESUME_FILE")
+    source "$RESUME_FILE"
 else
     echo "Invalid mode argument: $MODE"
     exit 1
@@ -41,7 +41,7 @@ function cleanup()
         echo
         echo "Error or cancel during processing. Not destroying snapshot." \
             "Please check for any errors that need to be fixed and run" \
-            "'./backup_resume $SETTINGS $TIMESTAMP' to retry."
+            "'./backup_resume' to retry."
     else
         echo "Destroying snapshot $SNAPSHOT"
         sudo zfs destroy "$SNAPSHOT"
@@ -66,7 +66,7 @@ export SET_PATH SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB ZFS_POOL
 if [[ "$MODE" == scratch ]]; then
     impl/create_sets.py "${BACKUP_PATHS[@]}"
 fi
-echo -n "$TIMESTAMP" >"$RESUME_FILE"
+echo -e "SETTINGS=\"$SETTINGS\"\\nTIMESTAMP=\"$TIMESTAMP\"" >"$RESUME_FILE"
 
 export BUCKET_DIR BUFFER_PATH S3_BUCKET TIMESTAMP
 impl/upload_sets.py
