@@ -6,7 +6,7 @@ MODE=$1
 RESUME_FILE=state/resume_info
 
 if [[ "$MODE" == scratch ]]; then
-    SETTINGS=$2
+    SETTINGS=$(realpath "$2")
     TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
     echo "Scratch backup"
 elif [[ "$MODE" == resume ]]; then
@@ -66,7 +66,7 @@ sudo mkdir -p "$SNAPSHOT_PATH"
 sudo mount -t zfs -o ro "$SNAPSHOT" "$SNAPSHOT_PATH"
 trap cleanup EXIT
 
-export SET_PATH SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB ZFS_POOL
+export SET_PATH SETTINGS SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB SEAL_ACTION ZFS_POOL
 
 if [[ "$MODE" == scratch ]]; then
     impl/create_sets.py "${BACKUP_PATHS[@]}"

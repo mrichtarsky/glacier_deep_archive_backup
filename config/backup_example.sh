@@ -41,3 +41,10 @@ SNAPSHOT_PATH=/snapshot_aws_backup
 # Dir with at least 2 * UPLOAD_LIMIT_MB free space. A subdirectory 'backup_aws_buffer'
 # will be DELETED and recreated there!
 BUFFER_PATH_BASE='/tmp'
+
+# Sealing, see the README for details. Possible values:
+# - disable (default): Do not use sealing
+# - seal_after_backup: Assume that this is the final backup of each backup path. Sets
+#   each backup path to immutable on the file system and places a .GDAB_SEALED symlink.
+# - skip_sealed: Do not backup any directories containing the .GDAB_SEALED marker.
+SEAL_ACTION=disable

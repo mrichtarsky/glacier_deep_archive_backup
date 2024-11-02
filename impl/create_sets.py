@@ -26,6 +26,9 @@ import binpacking
 
 from impl.tools import BackupException, make_set_info_filename, size_to_string
 
+SEAL_AFTER_BACKUP, SKIP_SEALED = range(2)
+SEAL_MARKER_NAME = '.GDAB_SEALED'
+
 
 class SetWriter():
     def __init__(self, snapshot_path, set_path, zfs_pool):
@@ -256,14 +259,16 @@ class DualCounter:
         return result
 
 
-def update_find_counters(path, sub_num_files, sub_size_files):
-    cmd = fr"find '{path}' \( -type f -o -type l \) | wc -l"
+def update_find_counters(path, skipped_paths, sub_num_files, sub_size_files):
+    skipped_paths_str = ' '.join(f"-not -path '{skipped_path}*'"
+                                 for skipped_path in skipped_paths)
+    cmd = fr"find '{path}' \( -type f -o -type l \) {skipped_paths_str} | wc -l"
     output = subprocess.check_output(cmd, shell=True).decode()
     sub_num_files.add_counter2(int(output.strip()))
     sub_num_files.verify()
 
-    cmd = (fr"find '{path}' \( -type f -o -type l \) -printf '%s\n' "
-           f"| awk '{{sum+=$1}} END {{print sum}}'")
+    cmd = (fr"find '{path}' \( -type f -o -type l \) {skipped_paths_str} -printf '%s\n'"
+           f" | awk '{{sum+=$1}} END {{print sum}}'")
     output = subprocess.check_output(cmd, shell=True).decode()
     output = output.strip()
     if len(output) == 0:
@@ -274,7 +279,17 @@ def update_find_counters(path, sub_num_files, sub_size_files):
     sub_size_files.verify()
 
 
-def crawl(snapshot_path, backup_paths, upload_limit):
+def is_sealed(dir_):
+    if os.path.islink(os.path.join(dir_, SEAL_MARKER_NAME)):
+        out = subprocess.check_output(['lsattr', '-d', dir_]).decode()
+        if 'i' not in out.split(' ', maxsplit=1)[0]:
+            print(f'WARNING: Directory {dir_} contains a sealed marker but is not'
+                  ' immutable!')
+        return True
+    return False
+
+
+def crawl(snapshot_path, backup_paths, seal_action, upload_limit):
     root_node = Path(snapshot_path, None, upload_limit)
 
     num_files = DualCounter('files', 'walk', 'find')
@@ -286,6 +301,7 @@ def crawl(snapshot_path, backup_paths, upload_limit):
 
         sub_num_files = DualCounter('subfiles', 'walk', 'find')
         sub_size_files = DualCounter('subsize', 'walk', 'find')
+        skipped_paths = set()
 
         def process_file(node, file_path):
             info = os.lstat(file_path)  # Do not follow symlinks
@@ -297,6 +313,11 @@ def crawl(snapshot_path, backup_paths, upload_limit):
             node.add_file(file_, file_size)
 
         if not os.path.isdir(path):
+            if seal_action == SEAL_AFTER_BACKUP:
+                raise BackupException('Sealing of files not supported, please move'
+                                      f' file {path} to an extra directory and adjust'
+                                      ' the backup config to point to it instead of the'
+                                      ' file')
             node = root_node.get_node(os.path.dirname(path))
             process_file(node, path)
         else:
@@ -304,14 +325,18 @@ def crawl(snapshot_path, backup_paths, upload_limit):
             def raise_error(error):
                 raise error
 
-            for root, _, files in os.walk(path, topdown=False, onerror=raise_error,
-                                          followlinks=False):
-
+            for root, dirs, files in os.walk(path, topdown=True, onerror=raise_error,
+                                             followlinks=False):
+                if seal_action == SKIP_SEALED and is_sealed(root):
+                    print(f'Directory {root} is sealed, skipping')
+                    dirs[:] = []
+                    skipped_paths.add(root)
+                    continue
                 node = root_node.get_node(root)
                 for file_ in files:
                     process_file(node, os.path.join(root, file_))
 
-        update_find_counters(path, sub_num_files, sub_size_files)
+        update_find_counters(path, skipped_paths, sub_num_files, sub_size_files)
 
         num_files += sub_num_files
         size_files += sub_size_files
@@ -338,8 +363,8 @@ def glob_backup_paths(backup_paths_unglobbed, snapshot_path):
     return backup_paths, num_warnings
 
 
-def crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file):
-    root_node = crawl(snapshot_path, backup_paths, upload_limit)
+def crawl_and_write(snapshot_path, backup_paths, seal_action, upload_limit, state_file):
+    root_node = crawl(snapshot_path, backup_paths, seal_action, upload_limit)
     with open(state_file, 'wb') as f:
         pickle.dump(root_node, f)
 
@@ -358,6 +383,9 @@ if __name__ == '__main__':
     state_file = os.environ['STATE_FILE']
     set_path = os.path.normpath(os.environ['SET_PATH'])
     upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
+    seal_action_str = os.environ.get('SEAL_ACTION', 'disable')
+    seal_action = {'seal_after_backup': SEAL_AFTER_BACKUP,
+                   'skip_sealed': SKIP_SEALED}.get(seal_action_str.lower(), None)
 
     backup_paths, num_warnings = glob_backup_paths(backup_paths_unglobbed,
                                                    snapshot_path)
@@ -368,7 +396,23 @@ if __name__ == '__main__':
             print('ABORTED')
             sys.exit(1)
 
+    if seal_action == SEAL_AFTER_BACKUP:
+        settings = os.environ['SETTINGS']
+        out = subprocess.check_output(['zfs', 'get', '-H', '-o', 'value', 'mountpoint',
+                                       zfs_pool]).decode()
+        zfs_pool_mount_path = out.rstrip()
+        for backup_path in backup_paths:
+            absolute_backup_path = os.path.join(zfs_pool_mount_path, backup_path)
+            marker_path = os.path.join(absolute_backup_path, SEAL_MARKER_NAME)
+            if os.path.islink(marker_path):
+                if os.readlink(marker_path) != settings:
+                    raise BackupException(f'Seal marker {marker_path} already exists'
+                                          ' and points to a different config')
+            else:
+                os.symlink(settings, marker_path)
+            subprocess.check_call(['sudo', '-R', 'chattr', '+i', absolute_backup_path])
+
     # Save state after crawling file system, so can be resumed later
-    crawl_and_write(snapshot_path, backup_paths, upload_limit, state_file)
+    crawl_and_write(snapshot_path, backup_paths, seal_action, upload_limit, state_file)
     set_writer = SetWriter(snapshot_path, set_path, zfs_pool)
     load(state_file, set_writer, backup_paths)

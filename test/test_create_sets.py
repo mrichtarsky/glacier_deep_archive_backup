@@ -69,7 +69,7 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_
                             f', num_warnings={num_warnings}')
 
     set_writer = SetWriter(snapshot_path, SET_PATH, ZFS_POOL)
-    root_node = crawl(snapshot_path, backup_paths, upload_limit)
+    root_node = crawl(snapshot_path, backup_paths, None, upload_limit)
     root_node.create_backup_sets(set_writer, backup_paths)
 
     list_files = get_list_files(SET_PATH)

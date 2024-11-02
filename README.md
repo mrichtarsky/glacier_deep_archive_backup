@@ -109,6 +109,7 @@ permissions for reading the data to be backed up. Only the following operations 
 executed as `root`, for which the user must have `sudo` privileges:
 - Creating, mounting, unmounting and destroying the ZFS snapshot
 - Creating the path for the snapshot mount
+- For `chattr` when using sealing
 - For the fuzz test, creating a `tmpfs`
 
 Backups are saved in your S3 bucket in a timestamped directory (e.g. `2022-02-18-195831`).
@@ -134,6 +135,79 @@ Consider you want to be able to retrieve these backups when your house has burnt
 
 You should also test a full backup/restore cycle once. It can involve a small subset of
 data, e.g. 10 GiB, which will make the test cheap.
+
+### Sealing
+
+When your backup has lots of data which does not change, you can use _sealing_ to
+reduce upload times. Other backup solutions use incremental backups, reducing the
+amount of data uploaded after the first backup. However, it is discouraged to create
+long backup chains since the risk of something breaking increases, so even with
+incremental backups you will have to backup _all_ of your data from time to time. Sealing
+changes this. Let's assume you have a directory containing the pictures you made each
+year. At the end of the year, the directory does not change anymore:
+
+```
+pictures/2021 <-- no changes
+         2022 <-- no changes
+         2023 <-- no changes
+         2024 <-- still changes
+```
+
+With sealing, you create a backup config that specifies all past years. In the config
+you also set `SEAL_ACTION=seal_after_backup` and then do a scratch backup. You will
+get a backup (or more fitting: archive) of that data, and you'll never have to back it
+up again. To ensure the data does not get modified afterwards, all specified
+directories will be marked as immutable (recursively), preventing changes even by `root`.
+
+However, what happens with the directory `2024` above, which still receives changes
+that you want to backup regularly? With sealing, the whole `pictures` directory can be
+specified in the regular backup, but all sealed directories _will be skipped_. For this,
+you specify `SEAL_ACTION=skip_sealed` in your backup config.
+
+For a full restore, you will first need to restore the sealed backup, then your regular
+one.
+
+Here are two example backup configs for illustration:
+
+
+```
+config/backup_pictures_sealed:
+
+BACKUP_PATHS=(
+    pictures/2021
+    pictures/2022
+    pictures/2023
+)
+
+SEAL_ACTION=seal_after_backup
+```
+
+```
+config/backup_pictures:
+
+BACKUP_PATHS=(
+    pictures
+)
+
+SEAL_ACTION=skip_sealed
+```
+
+- Sealing is optional, you do not have to use it (just set to `disable` or do not
+  specify `SEAL_ACTION` at all)
+- Sealed directories are marked with a symlink `.GDAB_SEALED` at the root which then
+  applies recursively. The symlink points to the backup config.
+- Of course, you do not `expire` sealed backups, they remain forever, since the data
+  will not be part of another backup.
+- For adding sealed directories (e.g. when the year 2024 is over), you can
+  either:
+  - Extend the original backup config and redo the whole backup, deleting the old one
+  - Create a new backup config just for the new directories and backup that in addition
+- If you ever need to unseal a directory, make sure you unseal the whole directory tree:
+  - Go to the corresponding backup path that was specified in your config (e.g.
+  `pictures/2023`), which has the  `.GDAB_SEALED` symlink.
+  - Run `sudo chattr -R -i .`
+  - `rm .GDAB_SEALED`
+  - Make sure that data is covered by a regular backup.
 
 ## Restore
 
