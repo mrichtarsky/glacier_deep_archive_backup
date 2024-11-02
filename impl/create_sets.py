@@ -100,9 +100,10 @@ class Path():
             raise BackupException(f'Invalid filename {name}')
 
         if size > self.upload_limit:
-            raise BackupException(f'File size exceeds upload limit: {self.get_full_path()}/{name}'
-                                  f' (size={size_to_string(size)}, '
-                                  f'upload_limit={size_to_string(self.upload_limit)})')
+            raise BackupException('File size exceeds upload limit:'
+                                  f' {self.get_full_path()}/{name}'
+                                  f' (size={size_to_string(size)},'
+                                  f' upload_limit={size_to_string(self.upload_limit)})')
         self.files.add((name, size))
 
     def get_dir(self, name):
