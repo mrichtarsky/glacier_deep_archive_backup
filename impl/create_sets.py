@@ -304,13 +304,12 @@ def crawl(snapshot_path, backup_paths, seal_action, upload_limit):
         sub_size_files = DualCounter('subsize', 'walk', 'find')
         skipped_paths = set()
 
-        def process_file(node, file_path):
+        def process_file(node, file_path, file_):
             info = os.lstat(file_path)  # Do not follow symlinks
             sub_num_files.add_counter1(1)  # pylint: disable=cell-var-from-loop
             file_size = info[stat.ST_SIZE]
             sub_size_files.add_counter1(file_size)  # pylint: disable=cell-var-from-loop
 
-            file_ = os.path.basename(file_path)
             node.add_file(file_, file_size)
 
         if not os.path.isdir(path):
@@ -320,7 +319,7 @@ def crawl(snapshot_path, backup_paths, seal_action, upload_limit):
                                       ' the backup config to point to it instead of the'
                                       ' file')
             node = root_node.get_node(os.path.dirname(path))
-            process_file(node, path)
+            process_file(node, path, os.path.basename(path))
         else:
 
             def raise_error(error):
@@ -335,7 +334,7 @@ def crawl(snapshot_path, backup_paths, seal_action, upload_limit):
                     continue
                 node = root_node.get_node(root)
                 for file_ in files:
-                    process_file(node, os.path.join(root, file_))
+                    process_file(node, os.path.join(root, file_), file_)
 
         update_find_counters(path, skipped_paths, sub_num_files, sub_size_files)
 
