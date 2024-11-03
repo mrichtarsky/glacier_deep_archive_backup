@@ -87,10 +87,9 @@ class SetWriter():
 
 
 class Path():
-    def __init__(self, name, parent, upload_limit):
+    def __init__(self, name, parent):
         self.parent = parent
         self.name = name
-        self.upload_limit = upload_limit
         self.files = set()
         self.dirs = {}
         self.size = None  # Lazily computed
@@ -99,18 +98,18 @@ class Path():
         if name in ('.', '..', ''):
             raise BackupException(f'Invalid filename {name}')
 
-        if size > self.upload_limit:
+        if size > Path.UPLOAD_LIMIT:
             raise BackupException('File size exceeds upload limit:'
                                   f' {self.get_full_path()}/{name}'
                                   f' (size={size_to_string(size)},'
-                                  f' upload_limit={size_to_string(self.upload_limit)})')
+                                  f' upload_limit={size_to_string(Path.UPLOAD_LIMIT)})')
         self.files.add((name, size))
 
     def get_dir(self, name):
         if name in ('.', '..', ''):
             raise BackupException(f'Invalid dirname {name}')
 
-        return self.dirs.setdefault(name, Path(name, self, self.upload_limit))
+        return self.dirs.setdefault(name, Path(name, self))
 
     @lru_cache
     def get_snapshot_path(self):
@@ -182,7 +181,7 @@ class Path():
         DIR, FILE = 0, 1
         # When the path fits, we still cannot simply zip it up fully
         # since only a subset of entries may be in the backup_paths.
-        if (size <= self.upload_limit
+        if (size <= Path.UPLOAD_LIMIT
                 and self._is_inside_backup_paths(backup_paths, path)):
             items.append((path, size, DIR))
         else:
@@ -191,7 +190,7 @@ class Path():
                 if self._is_inside_backup_paths(backup_paths, file_path):
                     items.append((file_path, size, FILE))
             for dir_ in self.dirs.values():
-                if dir_.get_size() > self.upload_limit:
+                if dir_.get_size() > Path.UPLOAD_LIMIT:
                     dir_items = dir_.create_backup_sets(set_writer, backup_paths)
                     items.extend(dir_items)
                 else:
@@ -206,7 +205,7 @@ class Path():
             return items
 
         if len(items) > 0:
-            bins = binpacking.to_constant_volume(items, self.upload_limit, weight_pos=1)
+            bins = binpacking.to_constant_volume(items, Path.UPLOAD_LIMIT, weight_pos=1)
             for bin_index, bin_ in enumerate(bins):
                 paths = []
                 total_size = 0
@@ -290,8 +289,8 @@ def is_sealed(dir_):
     return False
 
 
-def crawl(snapshot_path, backup_paths, seal_action, upload_limit):
-    root_node = Path(snapshot_path, None, upload_limit)
+def crawl(snapshot_path, backup_paths, seal_action):
+    root_node = Path(snapshot_path, None)
 
     num_files = DualCounter('files', 'walk', 'find')
     size_files = DualCounter('size', 'walk', 'find')
@@ -363,8 +362,8 @@ def glob_backup_paths(backup_paths_unglobbed, snapshot_path):
     return backup_paths, num_warnings
 
 
-def crawl_and_write(snapshot_path, backup_paths, seal_action, upload_limit, state_file):
-    root_node = crawl(snapshot_path, backup_paths, seal_action, upload_limit)
+def crawl_and_write(snapshot_path, backup_paths, seal_action, state_file):
+    root_node = crawl(snapshot_path, backup_paths, seal_action)
     with open(state_file, 'wb') as f:
         pickle.dump(root_node, f)
 
@@ -382,7 +381,7 @@ if __name__ == '__main__':
     snapshot_path = os.path.normpath(os.environ['SNAPSHOT_PATH'])
     state_file = os.environ['STATE_FILE']
     set_path = os.path.normpath(os.environ['SET_PATH'])
-    upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
+    Path.UPLOAD_LIMIT = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
     seal_action_str = os.environ.get('SEAL_ACTION', 'disable')
     seal_action = {'seal_after_backup': SEAL_AFTER_BACKUP,
                    'skip_sealed': SKIP_SEALED}.get(seal_action_str.lower(), None)
@@ -413,6 +412,6 @@ if __name__ == '__main__':
             subprocess.check_call(['sudo', '-R', 'chattr', '+i', absolute_backup_path])
 
     # Save state after crawling file system, so can be resumed later
-    crawl_and_write(snapshot_path, backup_paths, seal_action, upload_limit, state_file)
+    crawl_and_write(snapshot_path, backup_paths, seal_action, state_file)
     set_writer = SetWriter(snapshot_path, set_path, zfs_pool)
     load(state_file, set_writer, backup_paths)
