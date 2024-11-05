@@ -16,5 +16,6 @@ RESTORE_TIER=Bulk
 # Where to extract the archives to
 EXTRACT_PATH=/tank_restore
 
-# Dir with at least UPLOAD_LIMIT_MB free space. A subdirectory 'restore_aws_buffer' will be DELETED and recreated there!
+# Dir with at least UPLOAD_LIMIT_MB free space. A subdirectory 'restore_aws_buffer'
+# will be DELETED and recreated there!
 BUFFER_PATH_BASE='/tmp'

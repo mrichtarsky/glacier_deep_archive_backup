@@ -13,6 +13,8 @@ from impl.tools import (BackupException, clean_multipart_uploads,
                         make_set_info_filename, size_to_string, size_to_string_factor,
                         size_to_unit)
 
+NUM_UPLOAD_RETRIES = 3
+
 
 def get_list_files(set_path):
     list_files = []
@@ -97,13 +99,22 @@ def archiver(archive_queue, snapshot_path, list_files, buffer_path):
         archive_queue.put(False)  # Failure
 
 
-def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_dir,
-                       timestamp):  # pylint: disable=too-many-statements
-    # Avoid extraneous directories on S3, normalize path
-    bucket_dir = bucket_dir.strip('/')
-    if len(bucket_dir):
-        bucket_dir += '/'
+class Uploader:
+    def __init__(self, s3_bucket, bucket_dir, timestamp):
+        self.bucket_path_prefix = f's3://{s3_bucket}/{bucket_dir}{timestamp}'
 
+    def upload(self, file_, archive_name, deep_archive):
+        bucket_path = f'{self.bucket_path_prefix}/{archive_name}'
+        cmd = ['aws', 's3', 'cp', file_, bucket_path]
+        if deep_archive:
+            cmd.extend(['--storage-class', 'DEEP_ARCHIVE'])
+        print(f"Running '{' '.join(cmd)}'")
+        t0 = time.time()
+        subprocess.run(cmd, check=True)
+        return time.time() - t0
+
+
+def package_and_upload(snapshot_path, set_path, buffer_path, uploader):  # pylint: disable=too-many-statements
     num_errors = 0
     list_files = get_list_files(set_path)
 
@@ -215,25 +226,15 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
             archived_bytes += archived_bytes_job
             print_status()
 
-            for i in range(3):
+            for i in range(NUM_UPLOAD_RETRIES):
                 print(f'Set {archive_index}/{len(list_files)}: Uploading {archive_name}'
                       f', attempt {i+1}')
 
-                def do_upload(file_, archive_name, deep_archive):
-                    bucket_path = f's3://{s3_bucket}/{bucket_dir}{timestamp}/{archive_name}'
-                    cmd = ['aws', 's3', 'cp', file_, bucket_path]
-                    if deep_archive:
-                        cmd.extend(['--storage-class', 'DEEP_ARCHIVE'])
-                    print(f"Running '{' '.join(cmd)}'")
-                    t0 = time.time()
-                    subprocess.run(cmd, check=True)
-                    return time.time() - t0
-
                 try:
-                    do_upload(contents_archive_file, contents_archive_name,
-                              deep_archive=False)
-                    file_upload_time_sec = do_upload(archive_file, archive_name,
-                                                     deep_archive=True)
+                    uploader.upload(contents_archive_file, contents_archive_name,
+                                    deep_archive=False)
+                    file_upload_time_sec = uploader.upload(archive_file, archive_name,
+                                                           deep_archive=True)
 
                     upload_success = True
                     net_uploaded_bytes += os.path.getsize(archive_file)
@@ -276,6 +277,41 @@ def package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket, bucket_d
     return num_errors
 
 
+def upload_restore_config(s3_bucket, bucket_dir, timestamp, settings, buffer_path,
+                          uploader):
+    buffer_path_base = os.path.dirname(buffer_path)
+    impl_path = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(impl_path, 'restore.tmpl')) as f:
+        template_str = f.read()
+    config = template_str.format(s3_bucket=s3_bucket, bucket_dir=bucket_dir,
+                                 timestamp=timestamp, buffer_path_base=buffer_path_base)
+
+    settings_filename = os.path.basename(settings)
+    stem, ext = os.path.splitext(settings_filename)
+    if stem.startswith('backup'):
+        stem = stem.replace('backup', 'restore')
+    else:
+        stem = f'restore_{stem}'
+    stem += f'_{timestamp}'
+    restore_filename = stem + ext
+    restore_file = os.path.join(buffer_path, restore_filename)
+    with open(restore_file, 'wt') as f:
+        print(config, file=f)
+
+    for i in range(NUM_UPLOAD_RETRIES):
+        print(f'Uploading restore config {restore_filename}, attempt {i+1}')
+        try:
+            uploader.upload(restore_file, restore_filename, deep_archive=False)
+            break
+        except subprocess.CalledProcessError as e:
+            print(f'Error during upload: {e}')
+    else:
+        os.unlink(restore_file)
+        return 1
+    os.unlink(restore_file)
+    return 0
+
+
 if __name__ == '__main__':
     snapshot_path = os.path.normpath(os.environ['SNAPSHOT_PATH'])
     set_path = os.environ['SET_PATH']
@@ -283,17 +319,26 @@ if __name__ == '__main__':
     s3_bucket = os.environ['S3_BUCKET']
     bucket_dir = os.environ['BUCKET_DIR']
     timestamp = os.environ['TIMESTAMP']
-
+    settings = os.environ['SETTINGS']
     upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
-    _, _, bytes_free = shutil.disk_usage(buffer_path)
 
+    # Avoid extraneous directories on S3, normalize path
+    bucket_dir = bucket_dir.strip('/')
+    if len(bucket_dir):
+        bucket_dir += '/'
+
+    _, _, bytes_free = shutil.disk_usage(buffer_path)
     if bytes_free < upload_limit:
         raise BackupException(f'Not enough disk space in buffer path {buffer_path} '
                               f'(upload_limit={size_to_string(upload_limit)}, '
                               f'bytes_free={size_to_string(bytes_free)})')
 
-    num_errors = package_and_upload(snapshot_path, set_path, buffer_path, s3_bucket,
-                                    bucket_dir, timestamp)
+    uploader = Uploader(s3_bucket, bucket_dir, timestamp)
+
+    num_errors = package_and_upload(snapshot_path, set_path, buffer_path, uploader)
+
+    num_errors += upload_restore_config(s3_bucket, bucket_dir.rstrip('/'), timestamp,
+                                        settings, buffer_path, uploader)
 
     # During upload, files will be temporarily stored in S3 standard storage.
     # Failed uploads leave orphans behind, which will cause quite high costs.
