@@ -113,6 +113,21 @@ class Uploader:
         # So drop them here.
         clean_multipart_uploads(self.s3_bucket)
 
+    @staticmethod
+    def _is_internet_reachable():
+        command = ('aws', 'sts', 'get-caller-identity')
+        ret = subprocess.run(command, check=False, capture_output=True,
+                             stderr=subprocess.STDOUT)
+        if ret.returncode == 0 or 'could not connect' not in ret.stdout.lower():
+            return True
+        return False
+
+    @staticmethod
+    def _wait_for_internet():
+        while not Uploader._is_internet_reachable():
+            print('Internet connection to AWS does not work, waiting...')
+            time.sleep(5)
+
     def upload(self, file_, archive_name, deep_archive):
         bucket_path = f'{self.bucket_path_prefix}/{archive_name}'
         cmd = ['aws', 's3', 'cp', file_, bucket_path]
@@ -120,7 +135,11 @@ class Uploader:
             cmd.extend(['--storage-class', 'DEEP_ARCHIVE'])
         print(f"Running '{' '.join(cmd)}'")
         t0 = time.time()
-        subprocess.run(cmd, check=True)
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError:
+            Uploader._wait_for_internet()
+            raise
         return time.time() - t0
 
 
