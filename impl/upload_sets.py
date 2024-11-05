@@ -101,7 +101,17 @@ def archiver(archive_queue, snapshot_path, list_files, buffer_path):
 
 class Uploader:
     def __init__(self, s3_bucket, bucket_dir, timestamp):
+        self.s3_bucket = s3_bucket
         self.bucket_path_prefix = f's3://{s3_bucket}/{bucket_dir}{timestamp}'
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type_, value_, traceback_):
+        # During upload, files will be temporarily stored in S3 standard storage.
+        # Failed uploads leave orphans behind, which will cause quite high costs.
+        # So drop them here.
+        clean_multipart_uploads(self.s3_bucket)
 
     def upload(self, file_, archive_name, deep_archive):
         bucket_path = f'{self.bucket_path_prefix}/{archive_name}'
@@ -333,15 +343,10 @@ if __name__ == '__main__':
                               f'(upload_limit={size_to_string(upload_limit)}, '
                               f'bytes_free={size_to_string(bytes_free)})')
 
-    uploader = Uploader(s3_bucket, bucket_dir, timestamp)
+    with Uploader(s3_bucket, bucket_dir, timestamp) as uploader:
+        num_errors = package_and_upload(snapshot_path, set_path, buffer_path, uploader)
 
-    num_errors = package_and_upload(snapshot_path, set_path, buffer_path, uploader)
+        num_errors += upload_restore_config(s3_bucket, bucket_dir.rstrip('/'),
+                                            timestamp, settings, buffer_path, uploader)
 
-    num_errors += upload_restore_config(s3_bucket, bucket_dir.rstrip('/'), timestamp,
-                                        settings, buffer_path, uploader)
-
-    # During upload, files will be temporarily stored in S3 standard storage.
-    # Failed uploads leave orphans behind, which will cause quite high costs.
-    # So drop them here.
-    clean_multipart_uploads(s3_bucket)
     sys.exit(0 if num_errors == 0 else 1)
