@@ -101,9 +101,12 @@ download_queue = Queue()
 
 files = get_files(s3_bucket, bucket_dir, timestamp)
 if files is None:
-    raise BackupException('No files found in bucket. Please check whether the path specified'
-                          ' as TIMESTAMP in your restore config exists in your bucket'
-                          ' (it may contain slashes as well for subdirectories).')
+    raise BackupException('No files found in bucket. Please check whether the path'
+                          ' specified as TIMESTAMP in your restore config exists in'
+                          ' your bucket (it may contain slashes as well for'
+                          ' subdirectories).')
+print(f'Found {len(files)} file(s) in bucket')
+
 for file_ in files:
     request_restore(s3_bucket, file_[0], RESTORATION_PERIOD_DAYS, restore_tier,
                     files_to_restore)
@@ -115,12 +118,17 @@ wait_for_restore_thread.daemon = True
 wait_for_restore_thread.start()
 
 download_and_extract_thread = Thread(target=download_and_extract,
-                                     args=(s3_bucket, num_total_files, buffer_path, extract_path))
+                                     args=(s3_bucket, num_total_files, buffer_path,
+                                           extract_path))
 download_and_extract_thread.daemon = True
 download_and_extract_thread.start()
 
 prev_num_restores = None
 prev_num_downloads = None
+
+restore_time = {'standard': 12, 'bulk': 48}[restore_tier.lower()]
+print(f'NOTE: Restore at chosen tier {restore_tier} will take up to {restore_time}'
+      ' hours')
 
 while 1:
     num_restores = len(files_to_restore)
