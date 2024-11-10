@@ -409,7 +409,20 @@ if __name__ == '__main__':
                                           ' and points to a different config')
             else:
                 os.symlink(settings, marker_path)
-            subprocess.check_call(['sudo', 'chattr', '-R', '+i', absolute_backup_path])
+            cp = subprocess.run(['sudo', 'chattr', '-R', '+i', absolute_backup_path],
+                                check=False, capture_output=True)
+            if cp.returncode == 1:
+                # chattr cannot operate on symlinks, it will report an error and
+                # exit with returncode 1. Check that all error outputs refer to symlinks
+                # and if so, ignore the returncode
+                for line in cp.stderr.decode().splitlines():
+                    mo = re.match(r'^chattr: Operation not supported while reading'
+                                  r' flags on (.*)$', line)
+                    if not mo or not os.path.islink(mo.group(1)):
+                        print(f'Failed to make immutable: {mo.group(1)}')
+                        cp.check_returncode()
+            else:
+                cp.check_returncode()
 
     # Save state after crawling file system, so can be resumed later
     crawl_and_write(snapshot_path, backup_paths, seal_action, state_file)
