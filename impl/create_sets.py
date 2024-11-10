@@ -409,7 +409,7 @@ if __name__ == '__main__':
                                           ' and points to a different config')
             else:
                 os.symlink(settings, marker_path)
-            subprocess.check_call(['sudo', '-R', 'chattr', '+i', absolute_backup_path])
+            subprocess.check_call(['sudo', 'chattr', '-R', '+i', absolute_backup_path])
 
     # Save state after crawling file system, so can be resumed later
     crawl_and_write(snapshot_path, backup_paths, seal_action, state_file)
