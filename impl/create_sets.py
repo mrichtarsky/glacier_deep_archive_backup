@@ -265,7 +265,11 @@ def update_find_counters(path, skipped_paths, sub_num_files, sub_size_files):
     cmd = fr"find '{path}' \( -type f -o -type l \) {skipped_paths_str} | wc -l"
     output = subprocess.check_output(cmd, shell=True).decode()
     sub_num_files.add_counter2(int(output.strip()))
-    sub_num_files.verify()
+    try:
+        sub_num_files.verify()
+    except BackupException:
+        print(f'Exception during verify, {cmd=}')
+        raise
 
     cmd = (fr"find '{path}' \( -type f -o -type l \) {skipped_paths_str} -printf '%s\n'"
            f" | awk '{{sum+=$1}} END {{print sum}}'")
@@ -276,8 +280,11 @@ def update_find_counters(path, skipped_paths, sub_num_files, sub_size_files):
     else:
         size = int(output.strip())
     sub_size_files.add_counter2(size)
-    sub_size_files.verify()
-
+    try:
+        sub_size_files.verify()
+    except BackupException:
+        print(f'Exception during verify, {cmd=}')
+        raise
 
 def is_sealed(dir_):
     if os.path.islink(os.path.join(dir_, SEAL_MARKER_NAME)):
@@ -334,6 +341,11 @@ def crawl(snapshot_path, backup_paths, seal_action):
                 node = root_node.get_node(root)
                 for file_ in files:
                     process_file(node, os.path.join(root, file_), file_)
+                # os.walk returns symlinks to directories in dirs
+                for dir_ in dirs:
+                    dir_path = os.path.join(root, dir_)
+                    if os.path.islink(dir_path):
+                        process_file(node, dir_path, dir_)
 
         update_find_counters(path, skipped_paths, sub_num_files, sub_size_files)
 

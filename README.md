@@ -318,6 +318,8 @@ There are other backup solutions that can target Deep Glacier:
 
 # ToDo
 
+- Add dir symlinks to test
+
 - Add test for case where archiver thread runs into error
 
 - Add automated E2E test
