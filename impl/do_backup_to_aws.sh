@@ -44,9 +44,10 @@ function cleanup()
     sudo umount "$SNAPSHOT_PATH" || true
     if [[ -f "$RESUME_FILE" ]]; then
         echo
-        echo "Error or cancel during processing. Not destroying snapshot." \
-            "Please check for any errors that need to be fixed and run" \
-            "'./backup_resume' to retry."
+        echo "Error or cancel during processing. Not destroying snapshot" \
+            "($SNAPSHOT). Please check for any errors that need to be fixed" \
+            "and run './backup_resume' to retry. If you do not want to" \
+            "resume, please destroy the snapshot manually."
     else
         echo "Destroying snapshot $SNAPSHOT"
         sudo zfs destroy "$SNAPSHOT"
