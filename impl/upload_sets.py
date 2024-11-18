@@ -116,9 +116,9 @@ class Uploader:
     @staticmethod
     def _is_internet_reachable():
         command = ('aws', 'sts', 'get-caller-identity')
-        ret = subprocess.run(command, check=False, capture_output=True,
-                             stderr=subprocess.STDOUT)
-        if ret.returncode == 0 or 'could not connect' not in ret.stdout.lower():
+        cp = subprocess.run(command, check=False, capture_output=True, text=True)
+        output = (cp.stdout + cp.stderr).lower()
+        if cp.returncode == 0 or 'could not connect' not in output:
             return True
         return False
 
