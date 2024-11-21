@@ -11,8 +11,8 @@ import time
 
 import pytest
 
-from impl.create_sets import SetWriter, crawl, glob_backup_paths
-from impl.tools import BackupException
+from impl.create_sets import Path, SetWriter, crawl
+from impl.tools import BackupException, glob_backup_paths
 from impl.upload_sets import build_archive, get_list_files
 
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -46,7 +46,7 @@ def create_files(items):
 
 
 # pylint: disable=too-many-statements
-def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_limit,
+def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths,
                                 num_expected_warnings, num_expected_sets,
                                 num_expected_files):
     snapshot_path = os.path.normpath(snapshot_path)
@@ -69,7 +69,7 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_
                             f', num_warnings={num_warnings}')
 
     set_writer = SetWriter(snapshot_path, SET_PATH, ZFS_POOL)
-    root_node = crawl(snapshot_path, backup_paths, None, upload_limit)
+    root_node = crawl(snapshot_path, backup_paths, None)
     root_node.create_backup_sets(set_writer, backup_paths)
 
     list_files = get_list_files(SET_PATH)
@@ -153,11 +153,12 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths, upload_
 
 def run_test(pool_files, backup_paths, upload_limit, num_expected_warnings=None,
              num_expected_sets=None, num_expected_files=None, is_fuzz_run=False):
+    Path.UPLOAD_LIMIT = upload_limit
     for snapshot_path in SNAPSHOT_PATHS:
         try:
             run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths,
-                                        upload_limit, num_expected_warnings,
-                                        num_expected_sets, num_expected_files)
+                                        num_expected_warnings, num_expected_sets,
+                                        num_expected_files)
         except:
             if is_fuzz_run:
                 i = 0

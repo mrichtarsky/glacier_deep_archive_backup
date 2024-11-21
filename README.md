@@ -3,7 +3,7 @@
 **Note: If you are relying on this for your last-resort backup, please read everything
 below!**
 
-`glacier_deep_archive_backup` is a backup solution that uses
+`glacier_deep_archive_backup` (GDAB) is a backup solution that uses
 [S3 Glacier Deep Archive](https://aws.amazon.com/blogs/aws/new-amazon-s3-storage-class-glacier-deep-archive/)
 for storage. This is the most cost effective cloud backup storage I'm aware of. The use
 case is for full, off-site, encrypted backups that are only retrieved after a catastrophe
@@ -25,7 +25,7 @@ case is for full, off-site, encrypted backups that are only retrieved after a ca
       although they are tying this to "moving out of AWS" (without checking). So while you
       shouldn't rely on it, it's probably safe to assume that you won't need to pay the
       download fees above, which are 90% of the recovery costs, so for bulk you only pay
-      $2.56/TiB.
+      $2.56/TiB. Likely only applies to EU.
 
 - The assumption is that you will hopefully never need to restore ;) (and for testing, you
   can use the 100 GiB free download where you only pay for restore)
@@ -209,6 +209,45 @@ SEAL_ACTION=skip_sealed
   - `rm .GDAB_SEALED`
   - Make sure that data is covered by a regular backup.
 
+### Incremental Backups
+
+As mentioned, you always pay for 180 days for each byte you allocate. So the most
+cost-efficient strategy is to do a full backup every 180 days  (and when using sealing,
+only backing up the data that is not sealed). Of course, that leaves a half-year gap
+where data can go missing. On the other hand, a full backup each month will cause higher
+costs. Deleting the unneeded older full backups does not help, you will pay for 180
+days. Here, performing incremental backups in between the full backups make sense:
+
+- The length of the incremental chain will be reasonable, e.g. when backing up each
+  month there will only be six backups involved. So the risk that something along the
+  chain breaks is still small.
+- More importantly, due to sealing, you already have reduced the amount you have to
+  transfer for each full backup considerably.
+
+Therefore, GDAB also offers the option to do incremental backups using
+[`Duplicity`](https://duplicity.us/), which is very efficient. See the website for
+install instructions. In GDAB, use `backup_duplicity_full` and
+`backup_duplicity_incremental` to perform such backups. Why not just use Duplicity? If
+you do not want to use sealing, you should indeed use it directly. But with sealing, you
+can considerably reduce the time your full backups take.
+
+With sealing and incremental backups, your backup strategy looks as follows:
+
+- Create a backup config `config/all` with `SEAL_ACTION=skip_sealed` that covers all the
+  data you want to back up.
+
+- At the start of January and July:
+  1. Check which directories will not change anymore/can be archived (e.g. `pics/2024`).
+     Create a new backup config with `SEAL_ACTION=seal_after_backup` for it and run
+     `backup_scratch`.
+  2. For the rest of your data, create an initial full backup using
+     `backup_duplicity_full config/all`. Your backup config has `SEAL_ACTION=skip_sealed
+     and thus only backs up all non-archived files.
+
+- At the start of each other month:
+  1. Run `backup_duplicity_incremental config/all`. This will create an incremental
+     backup which will be very quick.
+
 ## Restore
 
 - `cp config/restore_example.sh config/restore.sh` and edit `restore.sh` to reflect your
@@ -234,11 +273,16 @@ manual steps:
 - Use `./extract_archive ARCHIVE DEST_PATH` to decrypt and extract it (e.g.
   `./extract_archive tank_pics_000.tar.zstd.gpg /tank_restore`)
 
+### Restoring Incremental Backups
+
+When you have made a backup using the Duplicity wrappers `backup_duplicity_*` , you can restore it
+directly with `duplicty s3://your_s3_bucket/bucket_dir`. You can also use any
+of Duplicity's options for e.g. restoring to a certain time or only restoring select
+parts.
+
 # Misc
 
 - Data is encrypted using [`gpg`](https://www.gnupg.org/) (`AES256` cipher)
-
-- Incremental backups are not supported
 
 - In addition to the costs above, there are these small additional charges:
     - $0.10/1000 requests for data retrieval
@@ -300,13 +344,15 @@ There are other backup solutions that can target Deep Glacier:
   you have to do that manually, and wait for availability, before any operations like
   `verify` or `restore` can work. If you only care about full backups, `duplicity` does
   not buy you much, in fact it will cause some overhead due to the signatures stored
-  both locally and on the backup, which are only needed for incremental backups.
+  both locally and on the backup, which are only needed for incremental backups. Also,
+  since you have to do a full backup from time to time, you will have to upload all
+  your data, since sealing is not available.
 
 - [`rclone`](https://rclone.org/)
 - [`aws sync`](https://awscli.amazonaws.com/v2/documentation/api/latest/reference/s3/sync.html)
 
    Both tools store files 1:1 in Deep Archive. Due to the cost structure this is
-   prohibitively expensive, and the reason why `glacier_deep_archive_backup` creates
+   prohibitively expensive, and the reason why GDAB creates
    archives. `aws sync` only supports server-side encryption, instead of client-side as
    done by this script. It cannot restore files automatically out of Deep Archive, while
    for `rclone` it's a manual step. This script does it automatically and also waits for

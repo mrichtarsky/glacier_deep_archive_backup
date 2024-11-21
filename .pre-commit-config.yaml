@@ -55,7 +55,7 @@ repos:
   # pylint: https://pylint.pycqa.org/en/latest/user_guide/installation/pre-commit-integration.html
   - id: pylint
     name: pylint
-    entry: bash -c 'PYTHONPATH=/r/lib/python:/repos/secrets pylint $@'
+    entry: bash -c 'PYTHONPATH=/r/lib/python:/repos/secrets:/p/gdab pylint $@'
     language: system
     types: [python]
     require_serial: true

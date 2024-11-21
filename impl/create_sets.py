@@ -14,7 +14,6 @@ Sets are processed later by upload_sets.py.
 import copy
 import json
 import os
-import pathlib
 import pickle
 import re
 import stat
@@ -24,10 +23,10 @@ from functools import lru_cache
 
 import binpacking
 
-from impl.tools import BackupException, make_set_info_filename, size_to_string
+from impl.tools import (GDAB_SEALED_MARKER, BackupException, glob_backup_paths_and_check,
+                        make_set_info_filename, size_to_string)
 
 SEAL_AFTER_BACKUP, SKIP_SEALED = range(2)
-SEAL_MARKER_NAME = '.GDAB_SEALED'
 
 
 class SetWriter():
@@ -286,8 +285,9 @@ def update_find_counters(path, skipped_paths, sub_num_files, sub_size_files):
         print(f'Exception during verify, {cmd=}')
         raise
 
+
 def is_sealed(dir_):
-    if os.path.islink(os.path.join(dir_, SEAL_MARKER_NAME)):
+    if os.path.islink(os.path.join(dir_, GDAB_SEALED_MARKER)):
         out = subprocess.check_output(['lsattr', '-d', dir_]).decode()
         if 'i' not in out.split(' ', maxsplit=1)[0]:
             print(f'WARNING: Directory {dir_} contains a sealed marker but is not'
@@ -360,20 +360,6 @@ def crawl(snapshot_path, backup_paths, seal_action):
     return root_node
 
 
-def glob_backup_paths(backup_paths_unglobbed, snapshot_path):
-    backup_paths = []
-    num_warnings = 0
-    base_path = pathlib.Path(snapshot_path)
-    for path_unglobbed in backup_paths_unglobbed:
-        paths_globbed = tuple(base_path.glob(path_unglobbed))
-        if len(paths_globbed) == 0:
-            print(f'WARNING: Path {path_unglobbed} does not exist and will be ignored!')
-            num_warnings += 1
-        for path_globbed in paths_globbed:
-            backup_paths.append(os.fspath(path_globbed.relative_to(base_path)))
-    return backup_paths, num_warnings
-
-
 def crawl_and_write(snapshot_path, backup_paths, seal_action, state_file):
     root_node = crawl(snapshot_path, backup_paths, seal_action)
     with open(state_file, 'wb') as f:
@@ -398,14 +384,7 @@ if __name__ == '__main__':
     seal_action = {'seal_after_backup': SEAL_AFTER_BACKUP,
                    'skip_sealed': SKIP_SEALED}.get(seal_action_str.lower(), None)
 
-    backup_paths, num_warnings = glob_backup_paths(backup_paths_unglobbed,
-                                                   snapshot_path)
-    if num_warnings > 0 and os.environ.get('IGNORE_WARNINGS') != '1':
-        res = input(f'{num_warnings} warning(s) encountered, see above.'
-                    ' Proceed? (IGNORE_WARNINGS=1 skips this) [y/n] ').strip().lower()
-        if res != 'y':
-            print('ABORTED')
-            sys.exit(1)
+    backup_paths = glob_backup_paths_and_check(backup_paths_unglobbed, snapshot_path)
 
     if seal_action == SEAL_AFTER_BACKUP:
         settings = os.environ['SETTINGS']
@@ -414,7 +393,7 @@ if __name__ == '__main__':
         zfs_pool_mount_path = out.rstrip()
         for backup_path in backup_paths:
             absolute_backup_path = os.path.join(zfs_pool_mount_path, backup_path)
-            marker_path = os.path.join(absolute_backup_path, SEAL_MARKER_NAME)
+            marker_path = os.path.join(absolute_backup_path, GDAB_SEALED_MARKER)
             if os.path.islink(marker_path):
                 if os.readlink(marker_path) != settings:
                     raise BackupException(f'Seal marker {marker_path} already exists'

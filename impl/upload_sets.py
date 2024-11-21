@@ -10,8 +10,8 @@ import threading
 import time
 
 from impl.tools import (BackupException, clean_multipart_uploads,
-                        make_set_info_filename, size_to_string, size_to_string_factor,
-                        size_to_unit)
+                        make_set_info_filename, normalize_bucket_dir, size_to_string,
+                        size_to_string_factor, size_to_unit)
 
 NUM_UPLOAD_RETRIES = 3
 
@@ -347,14 +347,10 @@ if __name__ == '__main__':
     buffer_path = os.environ['BUFFER_PATH']
     s3_bucket = os.environ['S3_BUCKET']
     bucket_dir = os.environ['BUCKET_DIR']
+    bucket_dir = normalize_bucket_dir(bucket_dir)
     timestamp = os.environ['TIMESTAMP']
     settings = os.environ['SETTINGS']
     upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
-
-    # Avoid extraneous directories on S3, normalize path
-    bucket_dir = bucket_dir.strip('/')
-    if len(bucket_dir):
-        bucket_dir += '/'
 
     _, _, bytes_free = shutil.disk_usage(buffer_path)
     if bytes_free < upload_limit:

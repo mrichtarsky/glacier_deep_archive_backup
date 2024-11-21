@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 1 ]]; then
+    echo "Usage: ./backup_duplicity_incremental SETTINGS_FILE"
+    echo "  Example: ./backup_duplicity_incremental config/backup.sh"
+    exit 1
+fi
+
+SETTINGS=$1
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH+=:$ROOT
+export PYTHONUNBUFFERED=1
+
+pushd "$ROOT" >/dev/null
+trap 'popd >/dev/null' EXIT
+
+impl/do_backup_to_aws.sh duplicity_incremental "$SETTINGS" 2>&1 | tee -i logs/backup_duplicity_incremental.log
+echo "OK"

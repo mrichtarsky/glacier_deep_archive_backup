@@ -17,6 +17,14 @@ elif [[ "$MODE" == resume ]]; then
     fi
 
     source "$RESUME_FILE"
+elif [[ "$MODE" == duplicity_full ]]; then
+    SETTINGS=$(realpath "$2")
+    TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
+    echo "Full duplicity backup"
+elif [[ "$MODE" == duplicity_incremental ]]; then
+    SETTINGS=$(realpath "$2")
+    TIMESTAMP=$(date +%Y-%m-%d-%H%M%S)
+    echo "Incremental duplicity backup"
 else
     echo "Invalid mode argument: $MODE"
     exit 1
@@ -54,7 +62,7 @@ function cleanup()
     fi
 }
 
-if [[ "$MODE" == scratch ]]; then
+if [[ "$MODE" == scratch ]] || [[ "$MODE" == duplicity_full ]] || [[ "$MODE" == duplicity_incremental ]]; then
     rm -f "$RESUME_FILE"
     rm -f "$SET_PATH"/*
     mkdir -p "$SET_PATH"
@@ -67,15 +75,26 @@ sudo mkdir -p "$SNAPSHOT_PATH"
 sudo mount -t zfs -o ro "$SNAPSHOT" "$SNAPSHOT_PATH"
 trap cleanup EXIT
 
-export SET_PATH SETTINGS SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB SEAL_ACTION ZFS_POOL
+if [[ "$MODE" == duplicity_full ]]; then
+    export BUCKET_DIR BUFFER_PATH S3_BUCKET SEAL_ACTION SNAPSHOT_PATH
 
-if [[ "$MODE" == scratch ]]; then
-    impl/create_sets.py "${BACKUP_PATHS[@]}"
+    impl/duplicity_backup.py full "${BACKUP_PATHS[@]}"
+elif [[ "$MODE" == duplicity_incremental ]]; then
+    export BUCKET_DIR BUFFER_PATH S3_BUCKET SEAL_ACTION SNAPSHOT_PATH
+
+    impl/duplicity_backup.py incremental "${BACKUP_PATHS[@]}"
+else
+    export SET_PATH SETTINGS SNAPSHOT_PATH STATE_FILE UPLOAD_LIMIT_MB SEAL_ACTION ZFS_POOL
+
+    if [[ "$MODE" == scratch ]]; then
+        impl/create_sets.py "${BACKUP_PATHS[@]}"
+    fi
+    echo -e "SETTINGS=\"$SETTINGS\"\\nTIMESTAMP=\"$TIMESTAMP\"" >"$RESUME_FILE"
+
+    export BUCKET_DIR BUFFER_PATH S3_BUCKET TIMESTAMP
+    impl/upload_sets.py
+    rm "$RESUME_FILE"
 fi
-echo -e "SETTINGS=\"$SETTINGS\"\\nTIMESTAMP=\"$TIMESTAMP\"" >"$RESUME_FILE"
 
-export BUCKET_DIR BUFFER_PATH S3_BUCKET TIMESTAMP
-impl/upload_sets.py
-rm "$RESUME_FILE"
 
 echo "Completed backup (config=$SETTINGS, timestamp=$TIMESTAMP)"
