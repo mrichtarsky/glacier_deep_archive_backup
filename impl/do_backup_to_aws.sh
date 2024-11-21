@@ -88,8 +88,8 @@ else
 
     if [[ "$MODE" == scratch ]]; then
         impl/create_sets.py "${BACKUP_PATHS[@]}"
+        echo -e "SETTINGS=\"$SETTINGS\"\\nTIMESTAMP=\"$TIMESTAMP\"" >"$RESUME_FILE"
     fi
-    echo -e "SETTINGS=\"$SETTINGS\"\\nTIMESTAMP=\"$TIMESTAMP\"" >"$RESUME_FILE"
 
     export BUCKET_DIR BUFFER_PATH S3_BUCKET TIMESTAMP
     impl/upload_sets.py
