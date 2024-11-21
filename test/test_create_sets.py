@@ -12,7 +12,7 @@ import time
 import pytest
 
 from impl.create_sets import Path, SetWriter, crawl
-from impl.tools import BackupException, glob_backup_paths
+from impl.tools import BackupException, SealAction, glob_backup_paths
 from impl.upload_sets import build_archive, get_list_files
 
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
@@ -69,7 +69,7 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths,
                             f', num_warnings={num_warnings}')
 
     set_writer = SetWriter(snapshot_path, SET_PATH, ZFS_POOL)
-    root_node = crawl(snapshot_path, backup_paths, None)
+    root_node = crawl(snapshot_path, backup_paths, SealAction())
     root_node.create_backup_sets(set_writer, backup_paths)
 
     list_files = get_list_files(SET_PATH)

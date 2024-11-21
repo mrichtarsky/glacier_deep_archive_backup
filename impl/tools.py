@@ -98,6 +98,26 @@ def normalize_bucket_dir(bucket_dir):
     return bucket_dir
 
 
+class SealAction():
+    SEAL_AFTER_BACKUP, SKIP_SEALED = range(2)
+
+    def __init__(self):
+        seal_action_str = os.environ.get('SEAL_ACTION', 'disable')
+        try:
+            self.action = {'seal_after_backup': SealAction.SEAL_AFTER_BACKUP,
+                           'skip_sealed': SealAction.SKIP_SEALED,
+                           'disable': None}[seal_action_str.lower()]
+        except KeyError:
+            # pylint: disable=raise-missing-from
+            raise BackupException(f'Invalid seal action {seal_action_str}')
+
+    def is_seal_after_backup(self):
+        return self.action == SealAction.SEAL_AFTER_BACKUP
+
+    def is_skip_sealed(self):
+        return self.action == SealAction.SKIP_SEALED
+
+
 if __name__ == '__main__':
     for i in (0, 1, 1024, 1024**2, 1024**3, 1024**4, 1024**5):
         print(f'{i}: {size_to_string(i)}')

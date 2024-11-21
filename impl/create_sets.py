@@ -23,8 +23,9 @@ from functools import lru_cache
 
 import binpacking
 
-from impl.tools import (GDAB_SEALED_MARKER, BackupException, glob_backup_paths_and_check,
-                        make_set_info_filename, size_to_string)
+from impl.tools import (GDAB_SEALED_MARKER, BackupException, SealAction,
+                        glob_backup_paths_and_check, make_set_info_filename,
+                        size_to_string)
 
 SEAL_AFTER_BACKUP, SKIP_SEALED = range(2)
 
@@ -319,7 +320,7 @@ def crawl(snapshot_path, backup_paths, seal_action):
             node.add_file(file_, file_size)
 
         if not os.path.isdir(path):
-            if seal_action == SEAL_AFTER_BACKUP:
+            if seal_action.is_seal_after_backup():
                 raise BackupException('Sealing of files not supported, please move'
                                       f' file {path} to an extra directory and adjust'
                                       ' the backup config to point to it instead of the'
@@ -333,7 +334,7 @@ def crawl(snapshot_path, backup_paths, seal_action):
 
             for root, dirs, files in os.walk(path, topdown=True, onerror=raise_error,
                                              followlinks=False):
-                if seal_action == SKIP_SEALED and is_sealed(root):
+                if seal_action.is_skip_sealed() and is_sealed(root):
                     print(f'Directory {root} is sealed, skipping')
                     dirs[:] = []
                     skipped_paths.add(root)
@@ -380,13 +381,11 @@ if __name__ == '__main__':
     state_file = os.environ['STATE_FILE']
     set_path = os.path.normpath(os.environ['SET_PATH'])
     Path.UPLOAD_LIMIT = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
-    seal_action_str = os.environ.get('SEAL_ACTION', 'disable')
-    seal_action = {'seal_after_backup': SEAL_AFTER_BACKUP,
-                   'skip_sealed': SKIP_SEALED}.get(seal_action_str.lower(), None)
+    seal_action = SealAction()
 
     backup_paths = glob_backup_paths_and_check(backup_paths_unglobbed, snapshot_path)
 
-    if seal_action == SEAL_AFTER_BACKUP:
+    if seal_action.is_seal_after_backup():
         settings = os.environ['SETTINGS']
         out = subprocess.check_output(['zfs', 'get', '-H', '-o', 'value', 'mountpoint',
                                        zfs_pool]).decode()
