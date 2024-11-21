@@ -3,8 +3,8 @@ set -euxo pipefail
 
 trap 'echo "FAIL"' EXIT
 
-misc/pylint.sh
-misc/shellcheck.sh
+dev/pylint.sh
+dev/shellcheck.sh
 test/test_quick.sh
 
 trap - EXIT
