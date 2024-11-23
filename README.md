@@ -364,12 +364,17 @@ There are other backup solutions that can target Deep Glacier:
 
 # ToDo
 
-- Add dir symlinks to test
+- Testing
+  - Binary test data
+  - Tests need config/passphrase, generate automatically
+  - Add automated E2E test
+      - Including sealing, duplicity
+      - Also for insufficient disk space
+      - Upload to standard storage to skip waiting times
+  - Factor out creation of files to be backed up and use in unit and E2E tests
+  - Add symlinks to test
+  - Add test for case where archiver thread runs into error
 
-- Add test for case where archiver thread runs into error
-
-- Add automated E2E test
-    - Also for insufficient disk space
 
 - Wrap tar, count lines and show progress bar
   - Show a file every second
