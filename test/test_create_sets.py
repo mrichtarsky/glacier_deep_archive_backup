@@ -19,8 +19,6 @@ from impl.upload_sets import build_archive, get_list_files
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
 WORK_PATH = os.path.join(SCRIPT_PATH, 'work')
 os.makedirs(WORK_PATH, exist_ok=True)
-subprocess.run(('sudo', 'mount', '-t', 'tmpfs', '-o', 'size=1024m',
-                'glacier_deep_archive_backup_test', WORK_PATH), check=True)
 
 POOL_PATH = os.path.join(WORK_PATH, 'pool')
 ZFS_POOL = 'tank'
@@ -33,6 +31,23 @@ REPRO_PATH = os.path.join(SCRIPT_PATH, 'state', 'repro.pickle')
 os.makedirs(os.path.dirname(REPRO_PATH), exist_ok=True)
 
 thread_pool = ThreadPoolExecutor(max_workers=2 * os.cpu_count())
+
+
+def setup():
+    subprocess.run(('sudo', 'mount', '-t', 'tmpfs', '-o', 'size=1024m',
+                    'glacier_deep_archive_backup_test', WORK_PATH), check=True)
+
+
+def teardown():
+    subprocess.run(('sudo', 'umount', WORK_PATH), check=True)
+
+
+@pytest.fixture(scope='session', autouse=True)
+def setup_teardown():
+    setup()
+    yield
+    teardown()
+
 
 class TestException(Exception):
     pass
@@ -550,21 +565,23 @@ def test_fuzz_long():
 
 
 if __name__ == '__main__':
-    if '--repro' in sys.argv:
-        repro_path = sys.argv[sys.argv.index('--repro') + 1]
-        with open(repro_path, 'rb') as f:
-            args = pickle.load(f)
-            run_test_for_snapshot_paths(*args, num_expected_sets=None)
-    elif '--fuzz' in sys.argv:
-        # Endless fuzzing
-        total_runs = 0
-        try:
-            while 1:
-                test_fuzz_long()
-                total_runs += test_fuzz_long.FUZZ_LONG_NUM_RUNS
-        finally:
-            print(f'Runs: {total_runs}')
-    else:
-        print('Valid args: --repro, --fuzz')
-
-subprocess.run(('sudo', 'umount', WORK_PATH), check=True)
+    setup()
+    try:
+        if '--repro' in sys.argv:
+            repro_path = sys.argv[sys.argv.index('--repro') + 1]
+            with open(repro_path, 'rb') as f:
+                args = pickle.load(f)
+                run_test_for_snapshot_paths(*args, num_expected_sets=None)
+        elif '--fuzz' in sys.argv:
+            # Endless fuzzing
+            total_runs = 0
+            try:
+                while 1:
+                    test_fuzz_long()
+                    total_runs += test_fuzz_long.FUZZ_LONG_NUM_RUNS
+            finally:
+                print(f'Runs: {total_runs}')
+        else:
+            print('Valid args: --repro, --fuzz')
+    finally:
+        teardown()
