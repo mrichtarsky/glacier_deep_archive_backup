@@ -41,8 +41,8 @@ def create_files(items):
         else:
             path, _ = os.path.split(item_path)
             os.makedirs(os.path.join(POOL_PATH, path), exist_ok=True)
-            with open(os.path.join(POOL_PATH, item_path), 'wt') as f:
-                f.write('x' * size)
+            with open(os.path.join(POOL_PATH, item_path), 'wb') as f:
+                f.write(random.randbytes(size))
 
 
 # pylint: disable=too-many-statements

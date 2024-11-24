@@ -365,7 +365,6 @@ There are other backup solutions that can target Deep Glacier:
 # ToDo
 
 - Testing
-  - Binary test data
   - Tests need config/passphrase, generate automatically
   - Add automated E2E test
       - Including sealing, duplicity
