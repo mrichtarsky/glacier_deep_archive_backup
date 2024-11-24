@@ -29,11 +29,10 @@ ZFS_POOL = 'tank'
 SNAPSHOT_PATHS = ('/glacier_deep_archive_backup_test',
                   '/mnt/glacier_deep_archive_backup_test')
 SET_PATH = os.path.join(WORK_PATH, 'sets')
-REPRO_PATH = os.path.join(SCRIPT_PATH, 'state', 'repro.pickle.')
+REPRO_PATH = os.path.join(SCRIPT_PATH, 'state', 'repro.pickle')
 os.makedirs(os.path.dirname(REPRO_PATH), exist_ok=True)
 
 thread_pool = ThreadPoolExecutor(max_workers=2 * os.cpu_count())
-
 
 class TestException(Exception):
     pass
