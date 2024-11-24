@@ -8,6 +8,7 @@ import string
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -29,6 +30,8 @@ SET_PATH = os.path.join(WORK_PATH, 'sets')
 REPRO_PATH = os.path.join(SCRIPT_PATH, 'state', 'repro.pickle.')
 os.makedirs(os.path.dirname(REPRO_PATH), exist_ok=True)
 
+thread_pool = ThreadPoolExecutor(max_workers=2 * os.cpu_count())
+
 
 class TestException(Exception):
     pass
@@ -43,6 +46,20 @@ def create_files(items):
             os.makedirs(os.path.join(POOL_PATH, path), exist_ok=True)
             with open(os.path.join(POOL_PATH, item_path), 'wb') as f:
                 f.write(random.randbytes(size))
+
+
+class ArchiveBuilder:
+    def __init__(self, snapshot_path, work_path):
+        self.snapshot_path = snapshot_path
+        self.work_path = work_path
+
+    def run(self, list_file):
+        _, buffer_file = build_archive(self.snapshot_path, list_file, self.work_path)
+        return buffer_file
+
+
+def run_cmd(cmd):
+    subprocess.run(cmd, check=True)
 
 
 # pylint: disable=too-many-statements
@@ -83,19 +100,19 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths,
         raise TestException(f'Wrong number of sets={len(list_files)}'
                             f', expected={num_expected_sets}')
 
-    archive_paths = []
-    for list_file in list_files:
-        _, archive_path = build_archive(snapshot_path, list_file, WORK_PATH)
-        archive_paths.append(archive_path)
+    archive_builder = ArchiveBuilder(snapshot_path, WORK_PATH)
+    archive_paths = list(thread_pool.map(archive_builder.run, list_files))
 
     extract_path = os.path.join(WORK_PATH, 'extract')
     os.makedirs(extract_path, exist_ok=True)
 
+    cmds = []
     for archive_path in archive_paths:
         print(f'Extracting {archive_path}')
         extract_archive_path = os.path.join(SCRIPT_PATH, '..', 'extract_archive')
         cmd = (extract_archive_path, archive_path, extract_path)
-        subprocess.run(cmd, check=True)
+        cmds.append(cmd)
+    list(thread_pool.map(run_cmd, cmds))
 
     def raise_error(error):
         raise error
