@@ -70,8 +70,10 @@ def run_test_for_snapshot_paths(snapshot_path, pool_files, backup_paths,
     snapshot_path = os.path.normpath(snapshot_path)
     backup_paths_unglobbed = tuple(map(os.path.normpath, backup_paths))
 
+    print('Cleaning work dir')
     for item in os.listdir(WORK_PATH):
         shutil.rmtree(os.path.join(WORK_PATH, item), ignore_errors=True)
+    print('Creating pool')
     os.makedirs(POOL_PATH)
     os.makedirs(SET_PATH)
     create_files(pool_files)
