@@ -24,6 +24,8 @@ subprocess.run(('sudo', 'mount', '-t', 'tmpfs', '-o', 'size=1024m',
 
 POOL_PATH = os.path.join(WORK_PATH, 'pool')
 ZFS_POOL = 'tank'
+
+# Test two different kinds of snapshot paths
 SNAPSHOT_PATHS = ('/glacier_deep_archive_backup_test',
                   '/mnt/glacier_deep_archive_backup_test')
 SET_PATH = os.path.join(WORK_PATH, 'sets')
