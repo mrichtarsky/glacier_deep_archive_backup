@@ -36,6 +36,8 @@ cmd = ['duplicity', f'--name={name}', '--filter-literal']
 if SealAction().is_skip_sealed():
     cmd.append(f'--exclude-if-present={GDAB_SEALED_MARKER}')
 
+cmd.append('--exclude-if-present=.NO_BACKUP')
+
 prefix = '.'
 for backup_path in backup_paths:
     backup_path_prefixed = os.path.join(prefix, backup_path)
