@@ -207,6 +207,11 @@ SEAL_ACTION=skip_sealed
   `pictures/2023`), which has the  `.GDAB_SEALED` symlink.
   - Run `sudo chattr -R -i .`
   - `rm .GDAB_SEALED`
+  - You can use the script `unseal` as follows to unseal all directories of a backup
+    config:
+    ```
+    ./unseal config/backup_pictures_sealed
+    ```
   - Make sure that data is covered by a regular backup.
 
 ### Incremental Backups

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SETTINGS=$1
+
+source "$SETTINGS"
+
+pushd "/$ZFS_POOL" >/dev/null
+trap 'popd >/dev/null' EXIT
+
+for path in "${BACKUP_PATHS[@]}"; do
+    echo "Unsealing /$ZFS_POOL/$path"
+    pushd "$path" >/dev/null
+    sudo chattr -i .
+    rm -f .GDAB_SEALED
+    sudo chattr -R -i .
+    popd >/dev/null
+done
+
+
+echo "OK"
