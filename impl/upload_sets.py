@@ -9,7 +9,7 @@ import sys
 import threading
 import time
 
-from impl.tools import (BackupException, clean_multipart_uploads,
+from impl.tools import (BackupException, SealAction, clean_multipart_uploads,
                         make_set_info_filename, normalize_bucket_dir, size_to_string,
                         size_to_string_factor, size_to_unit)
 
@@ -34,11 +34,13 @@ def get_list_files(set_path):
     return list_files
 
 
-def build_archive(snapshot_path, list_file, buffer_path):
+def build_archive(snapshot_path, list_file, buffer_path, tar_extra_args=None):
     stem = os.path.splitext(os.path.basename(list_file))[0]
     archive_name = f'{stem}.tar.zstd.gpg'
     buffer_file = os.path.join(buffer_path, archive_name)
-    cmd = ('impl/build_archive.sh', snapshot_path, list_file, buffer_file)
+    cmd = ['impl/build_archive.sh', snapshot_path, list_file, buffer_file]
+    if tar_extra_args:
+        cmd.extend(tar_extra_args)
     print(f"Running '{' '.join(cmd)}'")
     subprocess.run(cmd, check=True)
 
@@ -52,7 +54,7 @@ def get_set_info_for(list_file):
         return info
 
 
-def archiver(archive_queue, snapshot_path, list_files, buffer_path):
+def archiver(archive_queue, snapshot_path, list_files, buffer_path, tar_extra_args):
     archive_file = None
     list_list_filepath = None
     contents_archive_file = None
@@ -65,7 +67,7 @@ def archiver(archive_queue, snapshot_path, list_files, buffer_path):
 
             t0 = time.time()
             archive_name, archive_file = build_archive(snapshot_path, list_file,
-                                                       buffer_path)
+                                                       buffer_path, tar_extra_args)
             archive_time_sec = time.time() - t0
             archive_size_bytes = os.path.getsize(archive_file)
 
@@ -143,7 +145,7 @@ class Uploader:
         return time.time() - t0
 
 
-def package_and_upload(snapshot_path, set_path, buffer_path, uploader):  # pylint: disable=too-many-statements
+def package_and_upload(snapshot_path, set_path, buffer_path, uploader, tar_extra_args):  # pylint: disable=too-many-statements
     num_errors = 0
     list_files = get_list_files(set_path)
 
@@ -235,7 +237,8 @@ def package_and_upload(snapshot_path, set_path, buffer_path, uploader):  # pylin
     # At most two archives will exist in parallel (one of it in process of being uploaded).
     archive_queue = queue.Queue(maxsize=1)
     archive_thread = threading.Thread(target=archiver,
-                                      args=(archive_queue, snapshot_path, list_files, buffer_path))
+                                      args=(archive_queue, snapshot_path, list_files,
+                                            buffer_path, tar_extra_args))
 
     archive_thread.daemon = True
     archive_thread.start()
@@ -357,7 +360,11 @@ if __name__ == '__main__':
     timestamp = os.environ['TIMESTAMP']
     settings = os.environ['SETTINGS']
     upload_limit = int(os.environ['UPLOAD_LIMIT_MB']) * 1024 * 1024
-
+    seal_action = SealAction()
+    if seal_action.is_skip_sealed():
+        extra_args = ('--exclude=*/.GDAB_SEALED', '--exclude=*/.GDAB_SEALED/*')
+    else:
+        extra_args = ()
     _, _, bytes_free = shutil.disk_usage(buffer_path)
     if bytes_free < upload_limit:
         raise BackupException(f'Not enough disk space in buffer path {buffer_path} '
@@ -365,7 +372,8 @@ if __name__ == '__main__':
                               f'bytes_free={size_to_string(bytes_free)})')
 
     with Uploader(s3_bucket, bucket_dir, timestamp) as uploader:
-        num_errors = package_and_upload(snapshot_path, set_path, buffer_path, uploader)
+        num_errors = package_and_upload(snapshot_path, set_path, buffer_path, uploader,
+                                        extra_args)
 
         num_errors += upload_restore_config(s3_bucket, bucket_dir.rstrip('/'),
                                             timestamp, settings, buffer_path, uploader)
