@@ -179,14 +179,20 @@ def package_and_upload(snapshot_path, set_path, buffer_path, uploader):  # pylin
         factor, unit = size_to_unit(total_size_bytes)
         archived_str = (f'{size_to_string_factor(archived_bytes, factor, None)}'
                         f'/{size_to_string_factor(total_size_bytes, factor, unit)}')
-        archived_perc = 100 * archived_bytes / total_size_bytes
+        try:
+            archived_perc = 100 * archived_bytes / total_size_bytes
+        except ZeroDivisionError:
+            archived_perc = 100
         if archive_time_sec > 0:
             archived_per_sec_str = f'{size_to_string(archived_bytes / archive_time_sec)}'
         else:
             archived_per_sec_str = '? MiB'
         uploaded_str = (f'{size_to_string_factor(gross_uploaded_bytes, factor, None)}'
                         f'/{size_to_string_factor(total_size_bytes, factor, unit)}')
-        upload_perc = 100 * gross_uploaded_bytes / total_size_bytes
+        try:
+            upload_perc = 100 * gross_uploaded_bytes / total_size_bytes
+        except ZeroDivisionError:
+            upload_perc = 100
         if upload_time_sec > 0:
             upload_per_sec_str = f'{size_to_string(net_uploaded_bytes / upload_time_sec)}'
         else:
