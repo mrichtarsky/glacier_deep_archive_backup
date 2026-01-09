@@ -8,6 +8,7 @@ shift
 shift
 shift
 
-tar -C "$SNAPSHOT_PATH" --create --verbatim-files-from "$@" "--files-from=$FILE_LIST" \
+tar -C "$SNAPSHOT_PATH" --create --exclude=*/.NO_BACKUP --exclude=*/.NO_BACKUP/* \
+  "$@" --verbatim-files-from "--files-from=$FILE_LIST" \
   | zstd | gpg -c --cipher-algo AES256 --passphrase-file config/passphrase.txt --batch \
   >"$ARCHIVE"

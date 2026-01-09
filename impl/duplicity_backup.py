@@ -11,8 +11,8 @@ import os
 import subprocess
 import sys
 
-from impl.tools import (GDAB_SEALED_MARKER, BackupException, SealAction,
-                        glob_backup_paths_and_check)
+from impl.tools import (GDAB_SEALED_MARKER, NO_BACKUP_MARKER, BackupException,
+                        SealAction, glob_backup_paths_and_check)
 
 snapshot_path = os.path.normpath(os.environ['SNAPSHOT_PATH'])
 buffer_path = os.environ['BUFFER_PATH']
@@ -36,7 +36,7 @@ cmd = ['duplicity', f'--name={name}', '--filter-literal']
 if SealAction().is_skip_sealed():
     cmd.append(f'--exclude-if-present={GDAB_SEALED_MARKER}')
 
-cmd.append('--exclude-if-present=.NO_BACKUP')
+cmd.append(f'--exclude-if-present={NO_BACKUP_MARKER}')
 
 prefix = '.'
 for backup_path in backup_paths:

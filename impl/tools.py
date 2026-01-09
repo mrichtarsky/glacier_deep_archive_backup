@@ -4,6 +4,7 @@ import pathlib
 import subprocess
 import sys
 
+NO_BACKUP_MARKER = '.NO_BACKUP'
 GDAB_SEALED_MARKER = '.GDAB_SEALED'
 
 

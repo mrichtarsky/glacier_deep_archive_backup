@@ -23,8 +23,8 @@ from functools import lru_cache
 
 import binpacking
 
-from impl.tools import (GDAB_SEALED_MARKER, BackupException, SealAction,
-                        glob_backup_paths_and_check, make_set_info_filename,
+from impl.tools import (GDAB_SEALED_MARKER, NO_BACKUP_MARKER, BackupException,
+                        SealAction, glob_backup_paths_and_check, make_set_info_filename,
                         size_to_string)
 
 SEAL_AFTER_BACKUP, SKIP_SEALED = range(2)
@@ -334,8 +334,13 @@ def crawl(snapshot_path, backup_paths, seal_action):
 
             for root, dirs, files in os.walk(path, topdown=True, onerror=raise_error,
                                              followlinks=False):
+                skip_msg = None
                 if seal_action.is_skip_sealed() and is_sealed(root):
-                    print(f'Directory {root} is sealed, skipping')
+                    skip_msg = f'Directory {root} is sealed, skipping'
+                elif os.path.isfile(os.path.join(root, NO_BACKUP_MARKER)):
+                    skip_msg = f'Directory {root} is excluded from backup, skipping'
+                if skip_msg:
+                    print(skip_msg)
                     dirs[:] = []
                     skipped_paths.add(root)
                     continue
